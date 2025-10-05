@@ -1,0 +1,119 @@
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, ShoppingCart, Heart, User, Bell, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+const Header = () => {
+  const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  return (
+    <header className="sticky top-0 z-50 w-full border-b bg-background">
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
+          {/* Logo */}
+          <Link to="/" className="flex items-center space-x-2">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-white font-bold text-lg">C</span>
+            </div>
+            <span className="text-xl font-bold">CommerceHub</span>
+          </Link>
+
+          {/* Search Bar */}
+          <div className="hidden md:flex flex-1 max-w-xl mx-8">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search for products..."
+                className="pl-10 w-full"
+              />
+            </div>
+          </div>
+
+          {/* Navigation Icons */}
+          <div className="flex items-center space-x-4">
+            {isAuthenticated ? (
+              <>
+                <Button variant="ghost" size="icon" asChild>
+                  <Link to="/favorites">
+                    <Heart className="h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="icon" asChild>
+                  <Link to="/messages">
+                    <MessageSquare className="h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="icon" asChild>
+                  <Link to="/notifications">
+                    <Bell className="h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="icon" asChild>
+                  <Link to="/cart">
+                    <ShoppingCart className="h-5 w-5" />
+                  </Link>
+                </Button>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <User className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <div className="px-2 py-2">
+                      <p className="text-sm font-medium">{user?.name}</p>
+                      <p className="text-xs text-muted-foreground">{user?.email}</p>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/account">My Account</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/orders">My Orders</Link>
+                    </DropdownMenuItem>
+                    {user?.role === 'seller' && (
+                      <DropdownMenuItem asChild>
+                        <Link to="/seller/dashboard">Seller Dashboard</Link>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout}>
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link to="/login">Sign In</Link>
+                </Button>
+                <Button asChild>
+                  <Link to="/signup">Sign Up</Link>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+export default Header;

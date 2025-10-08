@@ -1,35 +1,95 @@
-import { useState } from 'react';
-import ProductCard from '@/components/products/ProductCard';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Search, SlidersHorizontal } from 'lucide-react';
-
-// Mock data
-const products = Array.from({ length: 12 }, (_, i) => ({
-  id: `${i + 1}`,
-  title: `Product ${i + 1}`,
-  price: Math.floor(Math.random() * 500) + 50,
-  image: `https://images.unsplash.com/photo-${1505740420928 + i}?w=400`,
-  rating: 4 + Math.random(),
-  reviews: Math.floor(Math.random() * 500),
-}));
+import { useMemo, useState } from "react";
+import ProductCard from "@/components/products/ProductCard";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { SlidersHorizontal } from "lucide-react";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import {
+  fetchProducts,
+  fetchProductRating,
+  type Product,
+  type ProductsListResponse,
+} from "@/lib/api/products";
+import { fetchCategories, type Category } from "@/lib/api/categories";
 
 const categories = [
-  'Electronics',
-  'Computers',
-  'Accessories',
-  'Home & Living',
-  'Fashion',
-  'Cameras',
+  "Electronics",
+  "Computers",
+  "Accessories",
+  "Home & Living",
+  "Fashion",
+  "Cameras",
 ];
 
 const Products = () => {
   const [priceRange, setPriceRange] = useState([0, 1000]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [priceRangePending, setPriceRangePending] = useState<[number, number]>([
+    0, 1000,
+  ]);
+  // Search removed; handled by header
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(12);
+  const [sort, setSort] = useState<string>("");
+  const [selectedCategoryIdsPending, setSelectedCategoryIdsPending] = useState<
+    string[]
+  >([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [freeShippingPending, setFreeShippingPending] = useState(false);
+  const [expressPending, setExpressPending] = useState(false);
+  const [freeShipping, setFreeShipping] = useState(false);
+  const [express, setExpress] = useState(false);
+
+  const { data: categoriesData } = useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+  });
+
+  const { data, isLoading, isError } = useQuery<ProductsListResponse>({
+    queryKey: [
+      "products",
+      {
+        page,
+        limit,
+        sort,
+        priceRange,
+        selectedCategoryIds,
+        freeShipping,
+        express,
+      },
+    ],
+    queryFn: () =>
+      fetchProducts({
+        page,
+        limit,
+        sort,
+        minPrice: priceRange[0],
+        maxPrice: priceRange[1],
+        categoryIds: selectedCategoryIds,
+        freeShipping,
+        express,
+      }),
+  });
+
+  console.log(data);
+  const items: Product[] = data?.products ?? [];
+  const total = data?.results ?? items.length;
+
+  const ratingsQueries = useQueries({
+    queries: items.map((p) => ({
+      queryKey: ["product", p.id, "rating"],
+      queryFn: () => fetchProductRating(p.id),
+      enabled: !!p.id,
+    })),
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,34 +102,46 @@ const Products = () => {
                 <SlidersHorizontal className="h-5 w-5" />
                 Filters
               </h3>
-              
-              {/* Search */}
-              <div className="mb-6">
-                <Label className="mb-2 block">Search Products</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Search..."
-                    className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
+
+              {/* Search removed: handled by header */}
 
               {/* Categories */}
               <div className="mb-6">
                 <Label className="mb-3 block font-medium">Categories</Label>
                 <div className="space-y-2">
-                  {categories.map((category) => (
-                    <div key={category} className="flex items-center space-x-2">
-                      <Checkbox id={category} />
-                      <Label htmlFor={category} className="font-normal cursor-pointer">
-                        {category}
-                      </Label>
-                    </div>
-                  ))}
+                  {(categoriesData ?? []).map((c: Category) => {
+                    const id = String(
+                      (
+                        c as unknown as {
+                          _id?: string | number;
+                          id?: string | number;
+                        }
+                      )._id ?? c.id
+                    );
+                    const checked = selectedCategoryIdsPending.includes(id);
+                    return (
+                      <div key={id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`cat-${id}`}
+                          checked={checked}
+                          onCheckedChange={(val) => {
+                            setSelectedCategoryIdsPending((prev) => {
+                              const next = new Set(prev);
+                              if (val) next.add(id);
+                              else next.delete(id);
+                              return Array.from(next);
+                            });
+                          }}
+                        />
+                        <Label
+                          htmlFor={`cat-${id}`}
+                          className="font-normal cursor-pointer"
+                        >
+                          {c.name}
+                        </Label>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -77,38 +149,85 @@ const Products = () => {
               <div className="mb-6">
                 <Label className="mb-3 block font-medium">Price Range</Label>
                 <Slider
-                  value={priceRange}
-                  onValueChange={setPriceRange}
+                  value={priceRangePending}
+                  onValueChange={(vals) =>
+                    setPriceRangePending(vals as [number, number])
+                  }
                   max={1000}
                   step={10}
                   className="mb-2"
                 />
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>${priceRange[0]}</span>
-                  <span>${priceRange[1]}</span>
+                  <span>${priceRangePending[0]}</span>
+                  <span>${priceRangePending[1]}</span>
                 </div>
               </div>
 
               {/* Shipping Options */}
               <div className="mb-6">
-                <Label className="mb-3 block font-medium">Shipping Options</Label>
+                <Label className="mb-3 block font-medium">
+                  Shipping Options
+                </Label>
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="free-shipping" />
-                    <Label htmlFor="free-shipping" className="font-normal cursor-pointer">
+                    <Checkbox
+                      id="free-shipping"
+                      checked={freeShippingPending}
+                      onCheckedChange={(v) => setFreeShippingPending(!!v)}
+                    />
+                    <Label
+                      htmlFor="free-shipping"
+                      className="font-normal cursor-pointer"
+                    >
                       Free Shipping
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="express" />
-                    <Label htmlFor="express" className="font-normal cursor-pointer">
+                    <Checkbox
+                      id="express"
+                      checked={expressPending}
+                      onCheckedChange={(v) => setExpressPending(!!v)}
+                    />
+                    <Label
+                      htmlFor="express"
+                      className="font-normal cursor-pointer"
+                    >
                       Express Delivery
                     </Label>
                   </div>
                 </div>
               </div>
 
-              <Button className="w-full">Apply Filters</Button>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  setSelectedCategoryIds(selectedCategoryIdsPending);
+                  setFreeShipping(freeShippingPending);
+                  setExpress(expressPending);
+                  setPriceRange(priceRangePending);
+                  setPage(1);
+                }}
+              >
+                Apply Filters
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full mt-2"
+                onClick={() => {
+                  setSelectedCategoryIdsPending([]);
+                  setSelectedCategoryIds([]);
+                  setFreeShippingPending(false);
+                  setExpressPending(false);
+                  setFreeShipping(false);
+                  setExpress(false);
+                  setPriceRangePending([0, 1000]);
+                  setPriceRange([0, 1000]);
+                  setSort("");
+                  setPage(1);
+                }}
+              >
+                Clear Filters
+              </Button>
             </div>
           </aside>
 
@@ -117,36 +236,71 @@ const Products = () => {
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold">
                 All Products
-                <span className="text-muted-foreground text-base ml-2">({products.length} items)</span>
+                <span className="text-muted-foreground text-base ml-2">
+                  ({total} items)
+                </span>
               </h1>
-              
-              <Select defaultValue="popular">
+
+              <Select value={sort} onValueChange={setSort}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="popular">Most Popular</SelectItem>
-                  <SelectItem value="price-low">Price: Low to High</SelectItem>
-                  <SelectItem value="price-high">Price: High to Low</SelectItem>
-                  <SelectItem value="newest">Newest First</SelectItem>
-                  <SelectItem value="rating">Highest Rated</SelectItem>
+                  <SelectItem value="-createdAt">Newest First</SelectItem>
+                  <SelectItem value="price">Price: Low to High</SelectItem>
+                  <SelectItem value="-price">Price: High to Low</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {products.map((product) => (
-                <ProductCard key={product.id} {...product} />
-              ))}
+              {isLoading && (
+                <div className="text-sm text-muted-foreground">
+                  Loading products...
+                </div>
+              )}
+              {isError && (
+                <div className="text-sm text-destructive">
+                  Failed to load products.
+                </div>
+              )}
+              {!isLoading &&
+                !isError &&
+                items.map((product, idx) => {
+                  const ratingData = ratingsQueries[idx]?.data;
+                  return (
+                    <ProductCard
+                      key={product.id}
+                      id={product.id}
+                      title={product.title}
+                      price={product.price}
+                      image={product.image}
+                      rating={ratingData?.rating ?? 0}
+                      reviews={ratingData?.reviews ?? 0}
+                    />
+                  );
+                })}
             </div>
 
             {/* Pagination */}
             <div className="flex justify-center mt-12 gap-2">
-              <Button variant="outline">Previous</Button>
-              <Button variant="outline">1</Button>
-              <Button>2</Button>
-              <Button variant="outline">3</Button>
-              <Button variant="outline">Next</Button>
+              <Button
+                variant="outline"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <Button variant="outline" disabled>
+                Page {page}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={items.length < limit}
+              >
+                Next
+              </Button>
             </div>
           </main>
         </div>

@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { BASE_URL } from "@/lib/url";
 
 interface User {
   id: string;
   email: string;
   name: string;
-  role: 'buyer' | 'seller';
+  role: "buyer" | "seller";
   profileImage?: string;
 }
 
@@ -21,23 +22,29 @@ interface AuthContextType {
 interface SignupData {
   email: string;
   password: string;
+  confirmPassword: string;
   name: string;
-  role: 'buyer' | 'seller';
+  role: "buyer" | "seller";
   profileImage?: File;
+  address?: string;
+  phone?: string;
+  isSeller?: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Check for stored auth data on mount
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    
+    const storedToken = localStorage.getItem("token");
+    const storedUser = localStorage.getItem("user");
+
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
@@ -47,24 +54,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch('/api/v1/users/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
-        throw new Error('Login failed');
+        throw new Error("Login failed");
       }
 
       const data = await response.json();
-      
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const apiUser = data?.data?.user ?? data?.user ?? null;
+      const apiToken = data?.data?.token ?? data?.token ?? null;
+      if (!apiUser || !apiToken) {
+        throw new Error("Invalid auth response");
+      }
+      setToken(apiToken);
+      setUser(apiUser);
+      localStorage.setItem("token", apiToken);
+      localStorage.setItem("user", JSON.stringify(apiUser));
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       throw error;
     }
   };
@@ -72,32 +83,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = async (signupData: SignupData) => {
     try {
       const formData = new FormData();
-      formData.append('email', signupData.email);
-      formData.append('password', signupData.password);
-      formData.append('name', signupData.name);
-      formData.append('role', signupData.role);
-      
-      if (signupData.profileImage) {
-        formData.append('profileImage', signupData.profileImage);
-      }
+      formData.append("email", signupData.email);
+      formData.append("password", signupData.password);
+      formData.append("confirmPassword", signupData.confirmPassword);
+      formData.append("name", signupData.name);
+      formData.append("role", signupData.role);
 
-      const response = await fetch('/api/v1/users/signup', {
-        method: 'POST',
+      if (signupData.profileImage) {
+        formData.append("profileImage", signupData.profileImage);
+      }
+      if (signupData.address) {
+        formData.append("address", signupData.address);
+      }
+      if (signupData.phone) {
+        formData.append("phone", signupData.phone);
+      }
+      if (typeof signupData.isSeller === "boolean") {
+        formData.append("isSeller", String(signupData.isSeller));
+      }
+      console.log(formData);
+
+      const response = await fetch(`${BASE_URL}/api/v1/auth/signup`, {
+        method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Signup failed');
+        const message = await response.text().catch(() => "Signup failed");
+        throw new Error(message || "Signup failed");
       }
 
       const data = await response.json();
-      
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      console.log(data);
+
+      const apiUser = data?.data?.user ?? data?.user ?? null;
+      const apiToken = data?.data?.token ?? data?.token ?? null;
+      if (!apiUser || !apiToken) {
+        throw new Error("Invalid auth response");
+      }
+      setToken(apiToken);
+      setUser(apiUser);
+      localStorage.setItem("token", apiToken);
+      localStorage.setItem("user", JSON.stringify(apiUser));
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error("Signup error:", error);
       throw error;
     }
   };
@@ -105,8 +134,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
   };
 
   return (
@@ -129,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

@@ -1,62 +1,131 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Trash2, Plus, Minus } from 'lucide-react';
-import { toast } from 'sonner';
-
-interface CartItem {
-  id: string;
-  title: string;
-  price: number;
-  quantity: number;
-  image: string;
-}
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Trash2, Plus, Minus } from "lucide-react";
+import { toast } from "sonner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchCart,
+  removeCartItem,
+  updateCartItem,
+  type CartData,
+} from "@/lib/api/cart";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Cart = () => {
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    {
-      id: '1',
-      title: 'Premium Wireless Headphones',
-      price: 249.99,
-      quantity: 1,
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400',
-    },
-    {
-      id: '2',
-      title: 'Smart Watch Series 8',
-      price: 399.99,
-      quantity: 2,
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400',
-    },
-  ]);
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  const { data, isLoading, isError } = useQuery<CartData>({
+    queryKey: ["cart", { token: !!token }],
+    queryFn: () => fetchCart(token || undefined),
+    enabled: !!token,
+    retry: false,
+  });
 
-  const updateQuantity = (id: string, delta: number) => {
-    setCartItems(items =>
-      items.map(item =>
-        item.id === id
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-          : item
+  const [cartItems, setCartItems] = useState(() => data?.items ?? []);
+
+  // Keep local state in sync when data changes
+  if (data && cartItems.length !== data.items.length) {
+    setCartItems(data.items);
+  }
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      productId,
+      quantity,
+    }: {
+      productId: string;
+      quantity: number;
+    }) => updateCartItem(productId, quantity, token || undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (productId: string) =>
+      removeCartItem(productId, token || undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+      toast.success("Item removed from cart");
+    },
+  });
+
+  const updateQuantity = (productId: string, delta: number) => {
+    const item = cartItems.find((i) => i.productId === productId);
+    if (!item) return;
+    const nextQty = Math.max(1, item.quantity + delta);
+    setCartItems((items) =>
+      items.map((i) =>
+        i.productId === productId ? { ...i, quantity: nextQty } : i
       )
     );
+    updateMutation.mutate({ productId, quantity: nextQty });
   };
 
-  const removeItem = (id: string) => {
-    setCartItems(items => items.filter(item => item.id !== id));
-    toast.success('Item removed from cart');
+  const removeItem = (productId: string) => {
+    setCartItems((items) =>
+      items.filter((item) => item.productId !== productId)
+    );
+    deleteMutation.mutate(productId);
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = cartItems.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
   const shipping = subtotal > 100 ? 0 : 10;
   const total = subtotal + shipping;
 
-  if (cartItems.length === 0) {
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">
+            Please log in to view your cart
+          </h2>
+          <Button asChild>
+            <Link to="/login">Go to Login</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-sm text-muted-foreground">
+          Loading cart...
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Unable to load cart</h2>
+          <p className="text-muted-foreground mb-6">Please try again later</p>
+          <Button asChild>
+            <Link to="/products">Continue Shopping</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (data && data.items.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
-          <p className="text-muted-foreground mb-6">Add some products to get started</p>
+          <p className="text-muted-foreground mb-6">
+            Add some products to get started
+          </p>
           <Button asChild>
             <Link to="/products">Continue Shopping</Link>
           </Button>
@@ -82,34 +151,38 @@ const Cart = () => {
                       alt={item.title}
                       className="w-24 h-24 object-cover rounded-lg"
                     />
-                    
+
                     <div className="flex-1">
                       <h3 className="font-medium mb-1">{item.title}</h3>
-                      <p className="text-lg font-bold text-primary">${item.price.toFixed(2)}</p>
-                      
+                      <p className="text-lg font-bold text-primary">
+                        ${item.price.toFixed(2)}
+                      </p>
+
                       <div className="flex items-center gap-4 mt-3">
                         <div className="flex items-center border rounded-lg">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => updateQuantity(item.id, -1)}
+                            onClick={() => updateQuantity(item.productId, -1)}
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
-                          <span className="px-4 font-medium">{item.quantity}</span>
+                          <span className="px-4 font-medium">
+                            {item.quantity}
+                          </span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => updateQuantity(item.id, 1)}
+                            onClick={() => updateQuantity(item.productId, 1)}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
-                        
+
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => removeItem(item.productId)}
                           className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
@@ -117,7 +190,7 @@ const Cart = () => {
                         </Button>
                       </div>
                     </div>
-                    
+
                     <div className="text-right">
                       <p className="font-bold text-lg">
                         ${(item.price * item.quantity).toFixed(2)}
@@ -134,7 +207,7 @@ const Cart = () => {
             <Card>
               <CardContent className="p-6">
                 <h2 className="text-xl font-bold mb-4">Order Summary</h2>
-                
+
                 <div className="space-y-3 mb-4">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
@@ -143,7 +216,7 @@ const Cart = () => {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Shipping</span>
                     <span className="font-medium">
-                      {shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}
+                      {shipping === 0 ? "Free" : `$${shipping.toFixed(2)}`}
                     </span>
                   </div>
                   <Separator />

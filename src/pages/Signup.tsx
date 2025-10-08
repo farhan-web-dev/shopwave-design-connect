@@ -55,11 +55,17 @@ const Signup = () => {
         name: formData.name,
         email: formData.email,
         password: formData.password,
+        confirmPassword: formData.confirmPassword,
         role: formData.role,
+        isSeller: formData.role === 'seller',
         profileImage: profileImage || undefined,
       });
       toast.success('Account created successfully!');
-      navigate('/');
+      if (formData.role === 'seller') {
+        navigate('/seller/onboarding');
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       toast.error('Failed to create account. Please try again.');
     } finally {

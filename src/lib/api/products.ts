@@ -71,7 +71,7 @@ export async function fetchProducts(
   });
   if (!response.ok) throw new Error("Failed to fetch products");
   const json = await response.json();
-  console.log("products", json);
+  // console.log("products", json);
   const list: ProductApi[] =
     json?.data?.products ?? json?.products ?? json?.data ?? [];
   const withValidId = Array.isArray(list)
@@ -103,7 +103,7 @@ export async function fetchFeaturedProducts(): Promise<Product[]> {
   });
   if (!response.ok) throw new Error("Failed to fetch featured products");
   const json = await response.json();
-  console.log("f", json);
+  // console.log("f", json);
   const list: ProductApi[] =
     json?.data?.products ?? json?.products ?? json?.data ?? json;
   if (Array.isArray(list)) {
@@ -125,7 +125,7 @@ export async function fetchTrendingProducts(): Promise<Product[]> {
   });
   if (!response.ok) throw new Error("Failed to fetch trending products");
   const json = await response.json();
-  console.log("t", json);
+  // console.log("t", json);
   const list: ProductApi[] =
     json?.data?.products ?? json?.products ?? json?.data ?? json;
   if (Array.isArray(list)) {
@@ -163,7 +163,7 @@ export async function fetchProductRating(
     return { rating: 0, reviews: 0 };
   }
   const json = await response.json();
-  console.log("r", json);
+  // console.log("r", json);
   const rating =
     Number(json?.data?.averageRating ?? json?.averageRating ?? 0) || 0;
   const reviews =

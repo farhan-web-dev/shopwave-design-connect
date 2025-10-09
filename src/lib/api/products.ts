@@ -9,6 +9,10 @@ export interface ProductApi {
   image?: string;
   imageUrl?: string;
   images?: string[];
+  stock?: number;
+  quantity?: number;
+  category?: string | { name?: string; id?: string | number };
+  categoryId?: string | number | { _id?: string | number; name?: string };
   badge?: string;
 }
 
@@ -17,6 +21,9 @@ export interface Product {
   title: string;
   price: number;
   image: string;
+  stock?: number;
+  category?: string;
+  categoryId?: string;
   badge?: string;
 }
 
@@ -35,6 +42,32 @@ export interface FetchProductsParams {
 export interface ProductsListResponse {
   products: Product[];
   results?: number;
+}
+
+export type MyProduct = Product;
+
+export async function fetchMyProducts(token?: string): Promise<MyProduct[]> {
+  const url = `${BASE_URL}/api/v1/products/my-products`;
+  const response = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) throw new Error("Failed to fetch my products");
+  const json = await response.json();
+  console.log("my products", json);
+  const list: ProductApi[] =
+    json?.data?.products ?? json?.products ?? json?.data ?? [];
+  const withValidId = Array.isArray(list)
+    ? list.filter(
+        (p) =>
+          p &&
+          ((p.id !== undefined && p.id !== null) ||
+            (p._id !== undefined && p._id !== null))
+      )
+    : [];
+  return withValidId.map(mapProduct);
 }
 
 export async function fetchProducts(
@@ -93,7 +126,52 @@ function mapProduct(api: ProductApi): Product {
     typeof api.price === "string" ? parseFloat(api.price) : api.price ?? 0;
   const image =
     api.image || api.imageUrl || (api.images && api.images[0]) || "";
-  return { id, title, price: priceNum, image, badge: api.badge };
+  const stock =
+    typeof api.stock === "number"
+      ? api.stock
+      : typeof api.quantity === "number"
+      ? api.quantity
+      : undefined;
+  const categoryName = (() => {
+    if (typeof api.category === "string") return api.category;
+    if (api.category && typeof api.category === "object") {
+      const name = (api.category as { name?: string }).name;
+      if (name) return String(name);
+    }
+    if (api.categoryId && typeof api.categoryId === "object") {
+      const name = (api.categoryId as { name?: string }).name;
+      if (name) return String(name);
+    }
+    return undefined;
+  })();
+  const mappedCategoryId = (() => {
+    if (api.categoryId !== undefined && api.categoryId !== null) {
+      if (typeof api.categoryId === "object") {
+        const id = (api.categoryId as { _id?: string | number })._id;
+        if (id !== undefined && id !== null) return String(id);
+      } else if (
+        typeof api.categoryId === "string" ||
+        typeof api.categoryId === "number"
+      ) {
+        return String(api.categoryId);
+      }
+    }
+    if (api.category && typeof api.category === "object") {
+      const id = (api.category as { id?: string | number }).id;
+      if (id !== undefined && id !== null) return String(id);
+    }
+    return undefined;
+  })();
+  return {
+    id,
+    title,
+    price: priceNum,
+    image,
+    stock,
+    category: categoryName,
+    categoryId: mappedCategoryId,
+    badge: api.badge,
+  };
 }
 
 export async function fetchFeaturedProducts(): Promise<Product[]> {

@@ -1,4 +1,4 @@
-name: nextjs-frontend - Deploy to AWS EC2 (Production Mode)
+name: vite-frontend - Deploy to AWS EC2 (Production Mode)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy nextjs-frontend to EC2
+    name: Deploy vite-frontend to EC2
     runs-on: ubuntu-latest
 
     steps:
@@ -52,14 +52,14 @@ jobs:
               sudo npm install -g pm2
             fi
 
-            # Install frontend dependencies
+            # Install dependencies
             npm install --legacy-peer-deps
 
-            # Build the Next.js app for production
+            # Build the Vite app for production
             npm run build
 
             # Kill any previous instance
             pm2 delete invision_store || true
 
-            # Start the app in production mode
+            # Start the app using Vite preview in production mode
             NODE_ENV=production pm2 start npm --name invision_store -- run start

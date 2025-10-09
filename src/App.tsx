@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -14,6 +15,13 @@ import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import NotFound from "./pages/NotFound";
 import SellerOnboarding from "./pages/SellerOnboarding";
+import SellerLayout from "./components/seller/SellerLayout";
+import DashboardOverview from "./pages/seller/DashboardOverview";
+import MyProducts from "./pages/seller/MyProducts";
+import AddProduct from "./pages/seller/AddProduct";
+import OrdersReceived from "./pages/seller/OrdersReceived";
+import Messages from "./pages/seller/Messages";
+import ProfileSettings from "./pages/seller/ProfileSettings";
 
 const queryClient = new QueryClient();
 
@@ -24,22 +32,126 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-1">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/seller/onboarding" element={<SellerOnboarding />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/products/:id" element={<ProductDetail />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </main>
-            <Footer />
-          </div>
+          <Routes>
+            {/* Public Routes */}
+            <Route
+              path="/"
+              element={
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-1">
+                    <Home />
+                  </main>
+                  <Footer />
+                </div>
+              }
+            />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/seller/onboarding" element={<SellerOnboarding />} />
+            <Route
+              path="/products"
+              element={
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-1">
+                    <Products />
+                  </main>
+                  <Footer />
+                </div>
+              }
+            />
+            <Route
+              path="/products/:id"
+              element={
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-1">
+                    <ProductDetail />
+                  </main>
+                  <Footer />
+                </div>
+              }
+            />
+            <Route
+              path="/cart"
+              element={
+                <ProtectedRoute>
+                  <div className="flex flex-col min-h-screen">
+                    <Header />
+                    <main className="flex-1">
+                      <Cart />
+                    </main>
+                    <Footer />
+                  </div>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Seller Dashboard Routes */}
+            <Route
+              path="/seller/dashboard"
+              element={
+                <ProtectedRoute requiredRole="seller">
+                  <SellerLayout>
+                    <DashboardOverview />
+                  </SellerLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/seller/products"
+              element={
+                <ProtectedRoute requiredRole="seller">
+                  <SellerLayout>
+                    <MyProducts />
+                  </SellerLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/seller/products/add"
+              element={
+                <ProtectedRoute requiredRole="seller">
+                  <SellerLayout>
+                    <AddProduct />
+                  </SellerLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/seller/orders"
+              element={
+                <ProtectedRoute requiredRole="seller">
+                  <SellerLayout>
+                    <OrdersReceived />
+                  </SellerLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/seller/messages"
+              element={
+                <ProtectedRoute requiredRole="seller">
+                  <SellerLayout>
+                    <Messages />
+                  </SellerLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/seller/profile"
+              element={
+                <ProtectedRoute requiredRole="seller">
+                  <SellerLayout>
+                    <ProfileSettings />
+                  </SellerLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

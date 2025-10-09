@@ -163,7 +163,7 @@ export async function fetchProductRating(
     return { rating: 0, reviews: 0 };
   }
   const json = await response.json();
-  // console.log("r", json);
+  console.log("r", json);
   const rating =
     Number(json?.data?.averageRating ?? json?.averageRating ?? 0) || 0;
   const reviews =

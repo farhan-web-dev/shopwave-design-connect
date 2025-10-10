@@ -5,6 +5,7 @@ export interface ProductApi {
   _id?: string | number;
   title?: string;
   name?: string;
+  description?: string;
   price?: number | string;
   image?: string;
   imageUrl?: string;
@@ -19,6 +20,7 @@ export interface ProductApi {
 export interface Product {
   id: string;
   title: string;
+  description?: string;
   price: number;
   image: string;
   stock?: number;
@@ -126,6 +128,7 @@ function mapProduct(api: ProductApi): Product {
     typeof api.price === "string" ? parseFloat(api.price) : api.price ?? 0;
   const image =
     api.image || api.imageUrl || (api.images && api.images[0]) || "";
+  const description = api.description || "";
   const stock =
     typeof api.stock === "number"
       ? api.stock
@@ -165,6 +168,7 @@ function mapProduct(api: ProductApi): Product {
   return {
     id,
     title,
+    description,
     price: priceNum,
     image,
     stock,
@@ -172,6 +176,22 @@ function mapProduct(api: ProductApi): Product {
     categoryId: mappedCategoryId,
     badge: api.badge,
   };
+}
+
+export async function fetchProductById(
+  productId: string
+): Promise<Product | null> {
+  if (!productId) return null;
+  const response = await fetch(`${BASE_URL}/api/v1/products/${productId}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) return null;
+  const json = await response.json();
+  const data: ProductApi =
+    json?.data?.product ?? json?.product ?? json?.data ?? json;
+  if (!data) return null;
+  return mapProduct(data);
 }
 
 export async function fetchFeaturedProducts(): Promise<Product[]> {

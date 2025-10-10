@@ -14,6 +14,7 @@ import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import NotFound from "./pages/NotFound";
+import Checkout from "./pages/Checkout";
 import SellerOnboarding from "./pages/SellerOnboarding";
 import SellerLayout from "./components/seller/SellerLayout";
 import DashboardOverview from "./pages/seller/DashboardOverview";
@@ -81,6 +82,21 @@ const App = () => (
                     <Header />
                     <main className="flex-1">
                       <Cart />
+                    </main>
+                    <Footer />
+                  </div>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute>
+                  <div className="flex flex-col min-h-screen">
+                    <Header />
+                    <main className="flex-1">
+                      <Checkout />
                     </main>
                     <Footer />
                   </div>

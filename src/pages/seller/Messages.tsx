@@ -84,7 +84,7 @@ const Messages = () => {
           },
         });
         const json = await res.json();
-        console.log("conversations", json);
+        // console.log("conversations", json);
         return json.data || json;
       },
     });
@@ -104,7 +104,7 @@ const Messages = () => {
         }
       );
       const json = await res.json();
-      console.log("unreadCounts", json);
+      // console.log("unreadCounts", json);
       return (json.data || json) as UnreadCountsResponse;
     },
   });
@@ -140,7 +140,7 @@ const Messages = () => {
   // Sidebar users: show the other participant (not the current user)
   const sidebarSenders = useMemo(() => {
     const list = conversationsData?.conversations || [];
-    console.log("sidebarSenders raw", list);
+    // console.log("sidebarSenders raw", list);
     // Build entries with the "other participant" relative to the current user
     const entries = list
       .map((c) => {
@@ -194,7 +194,7 @@ const Messages = () => {
       return bt - at;
     });
 
-    console.log("sidebarSenders processed", deduped);
+    // console.log("sidebarSenders processed", deduped);
     return deduped;
   }, [conversationsData, currentUserId]);
 
@@ -254,7 +254,7 @@ const Messages = () => {
               byIdJson.conversation?.messages ||
               [];
             if (Array.isArray(byIdMsgs) && byIdMsgs.length >= 0) {
-              console.log("threadMessages by conversation id", byIdMsgs);
+              // console.log("threadMessages by conversation id", byIdMsgs);
               return byIdMsgs as BackendMessage[];
             }
           }
@@ -281,7 +281,7 @@ const Messages = () => {
         );
         const json = await res.json();
         const msgs = (json.data && json.data.messages) || json.messages || [];
-        console.log("threadMessages by pair", msgs);
+        // console.log("threadMessages by pair", msgs);
         return msgs as BackendMessage[];
       }
 

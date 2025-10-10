@@ -16,97 +16,158 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { ImageUpload } from "@/components/ui/image-upload";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import { toast } from "sonner";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { createProduct, type CreateProductData } from "@/lib/api/products";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchCategories, type Category } from "@/lib/api/categories";
+import { useToast } from "@/hooks/use-toast";
 
 const addProductSchema = z.object({
-  name: z.string().min(1, "Product name is required"),
-  category: z.string().min(1, "Category is required"),
-  price: z.string().min(1, "Price is required"),
-  quantity: z.string().min(1, "Quantity is required"),
-  shortDescription: z
-    .string()
-    .max(160, "Short description must be less than 160 characters"),
-  detailedDescription: z.string().min(1, "Detailed description is required"),
-  weight: z.string().optional(),
-  dimensions: z.string().optional(),
+  title: z.string().min(1, "Product title is required"),
+  description: z.string().min(1, "Product description is required"),
+  categoryId: z.string().min(1, "Category is required"), // Backend expects categoryId
+  price: z.number().min(0, "Price must be positive"),
+  stock: z.number().min(0, "Stock must be non-negative"),
+  images: z.array(z.string()).min(1, "At least one image is required"),
   freeShipping: z.boolean().optional(),
-  sku: z.string().optional(),
-  eanUpc: z.string().optional(),
+  condition: z.enum(["new", "used"]).optional(),
+  isAuction: z.boolean().optional(),
+  auctionEndDate: z.string().optional(),
 });
 
 type AddProductForm = z.infer<typeof addProductSchema>;
 
 const AddProduct = () => {
   const navigate = useNavigate();
-  const [images, setImages] = useState<File[]>([]);
-  const [shippingOpen, setShippingOpen] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const { user, token } = useAuth();
+  const { toast } = useToast();
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   const {
     register,
     handleSubmit,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<AddProductForm>({
     resolver: zodResolver(addProductSchema),
     defaultValues: {
-      name: "Vintage Leather Satchel",
-      price: "99.99",
-      quantity: "200",
+      title: "",
+      description: "",
+      categoryId: "", // Backend expects categoryId
+      price: 0,
+      stock: 0,
+      images: [],
       freeShipping: false,
-      weight: "0.5",
-      dimensions: "20x15x5",
-      sku: "SKU-PROD-001",
-      eanUpc: "1234567890123",
+      condition: "new",
+      isAuction: false,
+      auctionEndDate: "",
     },
   });
 
-  const categories = [
-    "Electronics",
-    "Clothing & Accessories",
-    "Home & Garden",
-    "Sports & Outdoors",
-    "Books & Media",
-    "Health & Beauty",
-    "Toys & Games",
-    "Automotive",
-    "Food & Beverage",
-    "Office Supplies",
-  ];
+  // Fetch categories
+  const {
+    data: categories = [],
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+  } = useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+  });
+
+  // Debug logging
+  console.log("Categories state:", {
+    categories,
+    categoriesLoading,
+    categoriesError,
+    categoriesLength: categories.length,
+  });
+
+  // If categories are not loading and there's an error, show some test categories
+  const displayCategories =
+    categories.length > 0
+      ? categories
+      : !categoriesLoading && categoriesError
+      ? [
+          { id: "1", name: "Electronics" },
+          { id: "2", name: "Clothing" },
+          { id: "3", name: "Home & Garden" },
+          { id: "4", name: "Sports" },
+          { id: "5", name: "Books" },
+        ]
+      : categories;
+
+  // Create product mutation
+  const createProductMutation = useMutation({
+    mutationFn: (data: CreateProductData) =>
+      createProduct(data, token || undefined),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Product created successfully",
+      });
+      navigate("/seller/products");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const onSubmit = async (data: AddProductForm) => {
-    try {
-      const formData = new FormData();
-
-      // Append form fields
-      Object.entries(data).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          formData.append(key, String(value));
-        }
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive",
       });
-
-      // Append images
-      images.forEach((image, index) => {
-        formData.append(`images[${index}]`, image);
-      });
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      toast.success("Product added successfully!");
-      navigate("/seller/products");
-    } catch (error) {
-      toast.error("Failed to add product. Please try again.");
-      console.error("Error adding product:", error);
+      return;
     }
+
+    // Validate required fields
+    if (
+      !data.title ||
+      !data.description ||
+      !data.categoryId ||
+      data.price <= 0
+    ) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (imageUrls.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please upload at least one image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const productData: CreateProductData = {
+      sellerId: user.id,
+      title: data.title,
+      description: data.description,
+      categoryId: data.categoryId, // Backend expects categoryId (the actual ID)
+      price: data.price,
+      stock: data.stock,
+      images: imageUrls,
+      freeShipping: data.freeShipping,
+      condition: data.condition,
+      isAuction: data.isAuction,
+      auctionEndDate: data.auctionEndDate,
+    };
+
+    console.log("Submitting product data:", productData);
+    createProductMutation.mutate(productData);
   };
 
   return (
@@ -124,42 +185,73 @@ const AddProduct = () => {
             <CardTitle>Product Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Product Name */}
+            {/* Product Title */}
             <div className="space-y-2">
-              <Label htmlFor="name">Product Name</Label>
+              <Label htmlFor="title">Product Title</Label>
               <Input
-                id="name"
-                {...register("name")}
-                placeholder="Enter product name"
+                id="title"
+                {...register("title")}
+                placeholder="Enter product title"
               />
-              {errors.name && (
-                <p className="text-sm text-red-600">{errors.name.message}</p>
+              {errors.title && (
+                <p className="text-sm text-red-600">{errors.title.message}</p>
               )}
             </div>
 
             {/* Category */}
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select onValueChange={(value) => setValue("category", value)}>
+              <Label htmlFor="categoryId">Category</Label>
+              <Select onValueChange={(value) => setValue("categoryId", value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue
+                    placeholder={
+                      categoriesLoading
+                        ? "Loading categories..."
+                        : categoriesError
+                        ? "Error loading categories"
+                        : displayCategories.length === 0
+                        ? "No categories available"
+                        : "Select a category"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
+                  {categoriesLoading ? (
+                    <div className="px-2 py-1.5 text-sm text-gray-500">
+                      Loading categories...
+                    </div>
+                  ) : displayCategories.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-gray-500">
+                      No categories available
+                    </div>
+                  ) : (
+                    displayCategories
+                      .filter(
+                        (category) =>
+                          category &&
+                          category.name &&
+                          (category.id !== undefined ||
+                            category._id !== undefined)
+                      )
+                      .map((category) => (
+                        <SelectItem
+                          key={String(category.id)}
+                          value={String(category.id)} // Use category ID as value
+                        >
+                          {category.name}
+                        </SelectItem>
+                      ))
+                  )}
                 </SelectContent>
               </Select>
-              {errors.category && (
+              {errors.categoryId && (
                 <p className="text-sm text-red-600">
-                  {errors.category.message}
+                  {errors.categoryId.message}
                 </p>
               )}
             </div>
 
-            {/* Price and Quantity */}
+            {/* Price and Stock */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="price">Price</Label>
@@ -169,8 +261,10 @@ const AddProduct = () => {
                   </span>
                   <Input
                     id="price"
-                    {...register("price")}
+                    {...register("price", { valueAsNumber: true })}
                     placeholder="0.00"
+                    type="number"
+                    step="0.01"
                     className="pl-8"
                   />
                 </div>
@@ -180,100 +274,77 @@ const AddProduct = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity in Stock</Label>
+                <Label htmlFor="stock">Stock Quantity</Label>
                 <Input
-                  id="quantity"
-                  {...register("quantity")}
+                  id="stock"
+                  {...register("stock", { valueAsNumber: true })}
                   placeholder="0"
                   type="number"
                 />
-                {errors.quantity && (
-                  <p className="text-sm text-red-600">
-                    {errors.quantity.message}
-                  </p>
+                {errors.stock && (
+                  <p className="text-sm text-red-600">{errors.stock.message}</p>
                 )}
               </div>
             </div>
 
             {/* Product Images */}
             <div className="space-y-2">
-              <Label>Product Images (Max 5)</Label>
-              <ImageUpload maxImages={5} onImagesChange={setImages} />
-            </div>
-
-            {/* Short Description */}
-            <div className="space-y-2">
-              <Label htmlFor="shortDescription">Short Description</Label>
-              <Textarea
-                id="shortDescription"
-                {...register("shortDescription")}
-                placeholder="A concise summary of your product (max 160 characters)"
-                rows={3}
+              <Label>Product Images</Label>
+              <ImageUpload
+                maxImages={5}
+                onImagesChange={(files) => {
+                  // Convert files to URLs (you might want to upload to a service first)
+                  const urls = files.map((file) => URL.createObjectURL(file));
+                  setImageUrls(urls);
+                  setValue("images", urls);
+                }}
               />
-              {errors.shortDescription && (
-                <p className="text-sm text-red-600">
-                  {errors.shortDescription.message}
-                </p>
+              {errors.images && (
+                <p className="text-sm text-red-600">{errors.images.message}</p>
               )}
             </div>
 
-            {/* Detailed Description */}
+            {/* Product Description */}
             <div className="space-y-2">
-              <Label htmlFor="detailedDescription">
-                Detailed Product Description
-              </Label>
+              <Label htmlFor="description">Product Description</Label>
               <Textarea
-                id="detailedDescription"
-                {...register("detailedDescription")}
+                id="description"
+                {...register("description")}
                 placeholder="Provide a comprehensive description of your product, including features, benefits, and specifications"
                 rows={6}
               />
-              {errors.detailedDescription && (
+              {errors.description && (
                 <p className="text-sm text-red-600">
-                  {errors.detailedDescription.message}
+                  {errors.description.message}
                 </p>
               )}
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Shipping Details */}
-        <Card className="bg-white shadow-sm">
-          <Collapsible open={shippingOpen} onOpenChange={setShippingOpen}>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <CardTitle>Shipping Details</CardTitle>
-                  {shippingOpen ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
-                  )}
-                </div>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="weight">Weight (kg)</Label>
-                    <Input
-                      id="weight"
-                      {...register("weight")}
-                      placeholder="0.0"
-                    />
-                  </div>
+            {/* Product Options */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="condition">Condition</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setValue("condition", value as "new" | "used")
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select condition" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">New</SelectItem>
+                    <SelectItem value="used">Used</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.condition && (
+                  <p className="text-sm text-red-600">
+                    {errors.condition.message}
+                  </p>
+                )}
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="dimensions">Parcel (L x W x H)</Label>
-                    <Input
-                      id="dimensions"
-                      {...register("dimensions")}
-                      placeholder="0x0x0"
-                    />
-                  </div>
-                </div>
-
+              <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="freeShipping"
@@ -282,62 +353,55 @@ const AddProduct = () => {
                       setValue("freeShipping", !!checked)
                     }
                   />
-                  <Label htmlFor="freeShipping">Offer free shipping</Label>
+                  <Label htmlFor="freeShipping">Free Shipping</Label>
                 </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
+              </div>
+            </div>
 
-        {/* Advanced Options */}
-        <Card className="bg-white shadow-sm">
-          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <CardTitle>Advanced Options</CardTitle>
-                  {advancedOpen ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
+            {/* Auction Options */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isAuction"
+                  checked={watch("isAuction")}
+                  onCheckedChange={(checked) => {
+                    setValue("isAuction", !!checked);
+                    if (!checked) {
+                      setValue("auctionEndDate", "");
+                    }
+                  }}
+                />
+                <Label htmlFor="isAuction">This is an auction product</Label>
+              </div>
+
+              {watch("isAuction") && (
+                <div className="space-y-2">
+                  <Label htmlFor="auctionEndDate">Auction End Date</Label>
+                  <Input
+                    id="auctionEndDate"
+                    {...register("auctionEndDate")}
+                    type="datetime-local"
+                    placeholder="Select auction end date"
+                  />
+                  {errors.auctionEndDate && (
+                    <p className="text-sm text-red-600">
+                      {errors.auctionEndDate.message}
+                    </p>
                   )}
                 </div>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="sku">SKU (Stock Keeping Unit)</Label>
-                    <Input
-                      id="sku"
-                      {...register("sku")}
-                      placeholder="Enter SKU"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="eanUpc">EAN/UPC</Label>
-                    <Input
-                      id="eanUpc"
-                      {...register("eanUpc")}
-                      placeholder="Enter EAN/UPC"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Collapsible>
+              )}
+            </div>
+          </CardContent>
         </Card>
 
         {/* Submit Button */}
         <div className="flex justify-end">
           <Button
             type="submit"
-            disabled={isSubmitting}
+            disabled={createProductMutation.isPending}
             className="bg-amber-700 hover:bg-amber-800 text-white px-8"
           >
-            {isSubmitting ? "Saving..." : "Save Product"}
+            {createProductMutation.isPending ? "Creating..." : "Create Product"}
           </Button>
         </div>
       </form>

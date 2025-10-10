@@ -6,6 +6,7 @@ import {
   User,
   Bell,
   MessageSquare,
+  Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 const Header = () => {
   const { isAuthenticated, user, token, logout } = useAuth();
@@ -44,10 +52,15 @@ const Header = () => {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-white font-bold text-lg">C</span>
-            </div>
-            <span className="text-xl font-bold">CommerceHub</span>
+            <img
+              src="/favicon.ico"
+              alt="Invision"
+              className="h-8 w-8 rounded-lg shadow-sm"
+            />
+            <span className="font-bold text-2xl md:text-3xl leading-none">
+              <span className="text-orange-500">E</span>
+              nvision
+            </span>
           </Link>
 
           {/* Search Bar */}
@@ -62,8 +75,8 @@ const Header = () => {
             </div>
           </div>
 
-          {/* Navigation Icons */}
-          <div className="flex items-center space-x-4">
+          {/* Navigation Icons (desktop) */}
+          <div className="hidden md:flex items-center space-x-4">
             {isAuthenticated ? (
               <>
                 <Button variant="ghost" size="icon" asChild>
@@ -134,6 +147,81 @@ const Header = () => {
                 </Button>
               </>
             )}
+          </div>
+
+          {/* Mobile menu (authenticated and guest) */}
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-72 sm:w-80">
+                <SheetHeader>
+                  <SheetTitle>Menu</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 grid gap-3">
+                  {isAuthenticated ? (
+                    <>
+                      <Button variant="ghost" className="justify-start" asChild>
+                        <Link to="/favorites">
+                          <Heart className="h-4 w-4 mr-2" /> Favorites
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" className="justify-start" asChild>
+                        <Link to="/messages">
+                          <MessageSquare className="h-4 w-4 mr-2" /> Messages
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" className="justify-start" asChild>
+                        <Link to="/notifications">
+                          <Bell className="h-4 w-4 mr-2" /> Notifications
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="justify-between"
+                        asChild
+                      >
+                        <Link to="/cart">
+                          <span className="flex items-center">
+                            <ShoppingCart className="h-4 w-4 mr-2" /> Cart
+                          </span>
+                          {cartCount > 0 && (
+                            <span className="inline-flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
+                              {cartCount}
+                            </span>
+                          )}
+                        </Link>
+                      </Button>
+                      {user?.role === "seller" && (
+                        <Button
+                          variant="ghost"
+                          className="justify-start"
+                          asChild
+                        >
+                          <Link to="/seller/dashboard">Seller Dashboard</Link>
+                        </Button>
+                      )}
+                      <div className="h-px bg-border my-1" />
+                      <Button variant="destructive" onClick={handleLogout}>
+                        Sign Out
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="ghost" asChild>
+                        <Link to="/login">Sign In</Link>
+                      </Button>
+                      <Button asChild>
+                        <Link to="/signup">Sign Up</Link>
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>

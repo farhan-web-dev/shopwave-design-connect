@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,13 +31,44 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useQuery } from "@tanstack/react-query";
-import { fetchMyProducts, type MyProduct } from "@/lib/api/products";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchMyProducts,
+  updateProduct,
+  deleteProduct,
+  type MyProduct,
+  type UpdateProductData,
+} from "@/lib/api/products";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchCategories, type Category } from "@/lib/api/categories";
+import { useToast } from "@/hooks/use-toast";
 
 const MyProducts = () => {
   const { token } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [editingProduct, setEditingProduct] = useState<MyProduct | null>(null);
+  const [editFormData, setEditFormData] = useState<UpdateProductData>({});
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
   const {
     data: products = [],
     isLoading,
@@ -52,6 +83,49 @@ const MyProducts = () => {
     queryKey: ["categories"],
     queryFn: () => fetchCategories(),
     staleTime: 300000,
+  });
+
+  // Update product mutation
+  const updateProductMutation = useMutation({
+    mutationFn: (data: { productId: string; updateData: UpdateProductData }) =>
+      updateProduct(data.productId, data.updateData, token || undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-products"] });
+      toast({
+        title: "Success",
+        description: "Product updated successfully",
+      });
+      setIsEditDialogOpen(false);
+      setEditingProduct(null);
+      setEditFormData({});
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete product mutation
+  const deleteProductMutation = useMutation({
+    mutationFn: (productId: string) =>
+      deleteProduct(productId, token || undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-products"] });
+      toast({
+        title: "Success",
+        description: "Product deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const categoryIdToName = useMemo(() => {
@@ -77,9 +151,39 @@ const MyProducts = () => {
     }
   };
 
+  const handleEditProduct = (product: MyProduct) => {
+    setEditingProduct(product);
+    setEditFormData({
+      title: product.title,
+      price: product.price,
+      stock: product.stock,
+      categoryId: product.categoryId,
+      image: product.image,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateProduct = () => {
+    if (editingProduct) {
+      updateProductMutation.mutate({
+        productId: editingProduct.id,
+        updateData: editFormData,
+      });
+    }
+  };
+
   const handleDeleteProduct = (productId: string) => {
-    console.log("Delete product:", productId);
-    // Implement delete functionality
+    deleteProductMutation.mutate(productId);
+  };
+
+  const handleEditFormChange = (
+    field: keyof UpdateProductData,
+    value: string | number
+  ) => {
+    setEditFormData((prev) => ({
+      ...prev,
+      [field]: field === "price" || field === "stock" ? Number(value) : value,
+    }));
   };
 
   type ProductWithStatus = MyProduct & {
@@ -246,6 +350,7 @@ const MyProducts = () => {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0"
+                            onClick={() => handleEditProduct(product)}
                           >
                             <Edit className="h-3 w-3" />
                           </Button>
@@ -300,6 +405,105 @@ const MyProducts = () => {
           Add Product
         </Button>
       </Link>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+            <DialogDescription>
+              Make changes to your product here. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">
+                Title
+              </Label>
+              <Input
+                id="title"
+                value={editFormData.title || ""}
+                onChange={(e) => handleEditFormChange("title", e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="price" className="text-right">
+                Price
+              </Label>
+              <Input
+                id="price"
+                type="number"
+                step="0.01"
+                value={editFormData.price || ""}
+                onChange={(e) => handleEditFormChange("price", e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="stock" className="text-right">
+                Stock
+              </Label>
+              <Input
+                id="stock"
+                type="number"
+                value={editFormData.stock || ""}
+                onChange={(e) => handleEditFormChange("stock", e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category" className="text-right">
+                Category
+              </Label>
+              <Select
+                value={editFormData.categoryId || ""}
+                onValueChange={(value) =>
+                  handleEditFormChange("categoryId", value)
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={String(category.id)}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="image" className="text-right">
+                Image URL
+              </Label>
+              <Input
+                id="image"
+                value={editFormData.image || ""}
+                onChange={(e) => handleEditFormChange("image", e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleUpdateProduct}
+              disabled={updateProductMutation.isPending}
+            >
+              {updateProductMutation.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -248,3 +248,107 @@ export async function fetchProductRating(
     Number(json?.data?.totalReviews ?? json?.totalReviews ?? 0) || 0;
   return { rating, reviews };
 }
+
+export interface UpdateProductData {
+  title?: string;
+  price?: number;
+  stock?: number;
+  categoryId?: string;
+  image?: string;
+}
+
+export async function updateProduct(
+  productId: string,
+  data: UpdateProductData,
+  token?: string
+): Promise<Product> {
+  const url = `${BASE_URL}/api/v1/products/${productId}`;
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update product: ${errorText}`);
+  }
+
+  const json = await response.json();
+  const productData = json?.data ?? json;
+  return mapProduct(productData);
+}
+
+export async function deleteProduct(
+  productId: string,
+  token?: string
+): Promise<void> {
+  const url = `${BASE_URL}/api/v1/products/${productId}`;
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to delete product: ${errorText}`);
+  }
+}
+
+export interface CreateProductData {
+  sellerId: string;
+  title: string;
+  description: string;
+  categoryId: string; // Backend expects categoryId (the actual ID)
+  price: number;
+  stock: number;
+  images: string[];
+  freeShipping?: boolean;
+  condition?: "new" | "used";
+  isAuction?: boolean;
+  auctionEndDate?: string;
+}
+
+export async function createProduct(
+  data: CreateProductData,
+  token?: string
+): Promise<Product> {
+  const url = `${BASE_URL}/api/v1/products`;
+
+  console.log("Creating product with data:", data);
+  console.log("Using token:", token ? "Present" : "Missing");
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(data),
+  });
+
+  console.log("Response status:", response.status);
+  console.log(
+    "Response headers:",
+    Object.fromEntries(response.headers.entries())
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("API Error Response:", errorText);
+    throw new Error(
+      `Failed to create product (${response.status}): ${errorText}`
+    );
+  }
+
+  const json = await response.json();
+  console.log("Success response:", json);
+  const productData = json?.data ?? json;
+  return mapProduct(productData);
+}

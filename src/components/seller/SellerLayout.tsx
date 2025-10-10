@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { BASE_URL } from "@/lib/url";
 
 interface SellerLayoutProps {
   children: ReactNode;
@@ -32,7 +34,50 @@ interface SellerLayoutProps {
 const SellerLayout = ({ children }: SellerLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const currentUserId = user?.id;
+
+  interface UnreadCountRow {
+    conversationId: string;
+    count: number;
+  }
+  type UnreadCountsResponse =
+    | { counts?: UnreadCountRow[] }
+    | { unreadCounts?: Record<string, number> }
+    | Record<string, number>;
+
+  const { data: unreadCountsData } = useQuery<UnreadCountsResponse>({
+    queryKey: ["header-unread-counts", currentUserId],
+    enabled: !!currentUserId,
+    queryFn: async () => {
+      const res = await fetch(
+        `${BASE_URL}/api/v1/conversations/unread-counts?userId=${currentUserId}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
+      );
+      const json = await res.json();
+      return (json.data || json) as UnreadCountsResponse;
+    },
+  });
+
+  const totalUnread = useMemo(() => {
+    const data = unreadCountsData;
+    if (!data) return 0;
+    if (Array.isArray((data as { counts?: UnreadCountRow[] }).counts)) {
+      return ((data as { counts?: UnreadCountRow[] }).counts || []).reduce(
+        (sum, r) => sum + Number(r?.count || 0),
+        0
+      );
+    }
+    const map =
+      (data as { unreadCounts?: Record<string, number> }).unreadCounts ||
+      (data as Record<string, number>);
+    return Object.values(map || {}).reduce((s, n) => s + Number(n || 0), 0);
+  }, [unreadCountsData]);
 
   const navigation = [
     {
@@ -93,9 +138,16 @@ const SellerLayout = ({ children }: SellerLayoutProps) => {
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <Bell className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Mail className="h-4 w-4" />
-            </Button>
+            <Link to="/seller/messages">
+              <Button variant="ghost" size="icon" className="h-8 w-8 relative">
+                <Mail className="h-4 w-4" />
+                {totalUnread > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center">
+                    {totalUnread > 99 ? "99+" : totalUnread}
+                  </span>
+                )}
+              </Button>
+            </Link>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -149,7 +201,14 @@ const SellerLayout = ({ children }: SellerLayoutProps) => {
                         : "text-gray-700 hover:bg-gray-100"
                     )}
                   >
-                    <item.icon className="h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0" />
+                    <div className="relative">
+                      <item.icon className="h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0" />
+                      {item.name === "Messages" && totalUnread > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center">
+                          {totalUnread > 99 ? "99+" : totalUnread}
+                        </span>
+                      )}
+                    </div>
                     <span className="truncate">{item.name}</span>
                   </Link>
                 );

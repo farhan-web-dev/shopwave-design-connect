@@ -1,4 +1,18 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchNotifications,
+  markAllNotificationsRead,
+  type Notification,
+} from "@/lib/api/notification";
+
 import {
   Search,
   ShoppingCart,
@@ -55,6 +69,34 @@ const Header = () => {
     logout();
     navigate("/");
   };
+  const [openNotifications, setOpenNotifications] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Fetch notifications
+  const { data: notifications = [] } = useQuery<Notification[]>({
+    queryKey: ["notifications"],
+    queryFn: () => fetchNotifications(token!),
+    enabled: isAuthenticated && !!token,
+    staleTime: 5000,
+  });
+
+  console.log("Notifications:", notifications);
+
+  // Count unread
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Mark all as read when modal opens
+  const markReadMutation = useMutation({
+    mutationFn: () => markAllNotificationsRead(token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+
+  const handleOpenNotifications = () => {
+    setOpenNotifications(true);
+    markReadMutation.mutate();
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background">
@@ -105,11 +147,21 @@ const Header = () => {
                     <MessageSquare className="h-5 w-5" />
                   </Link>
                 </Button>
-                <Button variant="ghost" size="icon" asChild>
-                  <Link to="/notifications">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleOpenNotifications}
+                >
+                  <div className="relative">
                     <Bell className="h-5 w-5" />
-                  </Link>
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-4 -right-3 inline-flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </Button>
+
                 <Button variant="ghost" size="icon" asChild>
                   <Link to="/cart" className="relative">
                     <ShoppingCart className="h-5 w-5" />
@@ -201,11 +253,26 @@ const Header = () => {
                           <MessageSquare className="h-4 w-4 mr-2" /> Messages
                         </Link>
                       </Button>
-                      <Button variant="ghost" className="justify-start" asChild>
-                        <Link to="/notifications">
-                          <Bell className="h-4 w-4 mr-2" /> Notifications
-                        </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleOpenNotifications}
+                        className="flex items-center justify-between w-full px-4"
+                      >
+                        {/* Bell icon on left */}
+                        <div className="flex items-center gap-2">
+                          <Bell className="h-5 w-5" />
+                          <span className="text-sm font-medium">Bell</span>
+                        </div>
+
+                        {/* Count badge on the right */}
+                        {unreadCount > 0 && (
+                          <span className="flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
+                            {unreadCount}
+                          </span>
+                        )}
                       </Button>
+
                       <Button
                         variant="ghost"
                         className="justify-between"
@@ -252,6 +319,35 @@ const Header = () => {
           </div>
         </div>
       </div>
+      <Dialog open={openNotifications} onOpenChange={setOpenNotifications}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Notifications</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2 max-h-96 overflow-y-auto">
+            {notifications.filter((n) => !n.read).length === 0 ? (
+              <p className="text-center text-muted-foreground text-sm">
+                No unread notifications 🎉
+              </p>
+            ) : (
+              notifications
+                .filter((n) => !n.read)
+                .map((n) => (
+                  <div
+                    key={n._id}
+                    className="rounded-lg border p-3 hover:bg-muted transition-colors"
+                  >
+                    <p className="font-medium text-sm">{n.title}</p>
+                    <p className="text-xs text-muted-foreground">{n.message}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {new Date(n.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 };

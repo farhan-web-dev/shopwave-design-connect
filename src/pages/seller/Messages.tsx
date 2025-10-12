@@ -199,13 +199,13 @@ const Messages = () => {
   }, [conversationsData, currentUserId]);
 
   // Selected sender
-  useEffect(() => {
-    if (!selectedSenderId && sidebarSenders && sidebarSenders.length > 0) {
-      setSelectedSenderId(
-        sidebarSenders[0].sender.id || sidebarSenders[0].sender._id
-      );
-    }
-  }, [sidebarSenders, selectedSenderId]);
+  // useEffect(() => {
+  //   if (!selectedSenderId && sidebarSenders && sidebarSenders.length > 0) {
+  //     setSelectedSenderId(
+  //       sidebarSenders[0].sender.id || sidebarSenders[0].sender._id
+  //     );
+  //   }
+  // }, [sidebarSenders, selectedSenderId]);
 
   // Currently selected conversation id (based on selected other participant)
   const selectedConversationId = useMemo(() => {
@@ -423,247 +423,256 @@ const Messages = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-        {/* Conversations List */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Conversations</CardTitle>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search conversations..." className="pl-10" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[450px]">
-              <div className="space-y-1">
-                {(sidebarSenders || []).map((item) => {
-                  const senderId = item.sender.id || item.sender._id;
-                  const name = item.sender.name || "Unknown";
-                  const lastText = item.lastMessage?.content || "";
-                  const time = item.updatedAt
-                    ? new Date(item.updatedAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "";
-                  const unreadCount =
-                    unreadByConversationId[item.conversationId] ||
-                    unreadByConversationId[senderId] ||
-                    0;
-                  const isActive = selectedSenderId === senderId;
-                  return (
-                    <div
-                      key={item.conversationId || senderId}
-                      className={`p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
-                        isActive ? "bg-gray-100" : ""
-                      }`}
-                      onClick={() => setSelectedSenderId(senderId)}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={undefined as unknown as string} />
-                          <AvatarFallback>
-                            {name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {name}
-                            </p>
-                            <p className="text-xs text-gray-500">{time}</p>
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <p className="text-sm text-gray-600 truncate">
-                              {lastText}
-                            </p>
-                            {unreadCount > 0 && (
-                              <Badge className="bg-blue-600 text-white text-xs">
-                                {unreadCount}
-                              </Badge>
-                            )}
+        {/* ✅ Conversations List (Sidebar) */}
+        {!selectedSenderId && (
+          <Card className="lg:col-span-1 block lg:block">
+            <CardHeader>
+              <CardTitle>Conversations</CardTitle>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search conversations..."
+                  className="pl-10"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[450px]">
+                <div className="space-y-1">
+                  {(sidebarSenders || []).map((item) => {
+                    const senderId = item.sender.id || item.sender._id;
+                    const name = item.sender.name || "Unknown";
+                    const lastText = item.lastMessage?.content || "";
+                    const time = item.updatedAt
+                      ? new Date(item.updatedAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "";
+                    const unreadCount =
+                      unreadByConversationId[item.conversationId] ||
+                      unreadByConversationId[senderId] ||
+                      0;
+                    const isActive = selectedSenderId === senderId;
+                    return (
+                      <div
+                        key={item.conversationId || senderId}
+                        className={`p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
+                          isActive ? "bg-gray-100" : ""
+                        }`}
+                        onClick={() => setSelectedSenderId(senderId)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={undefined as unknown as string} />
+                            <AvatarFallback>
+                              {name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {name}
+                              </p>
+                              <p className="text-xs text-gray-500">{time}</p>
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <p className="text-sm text-gray-600 truncate">
+                                {lastText}
+                              </p>
+                              {unreadCount > 0 && (
+                                <Badge className="bg-blue-600 text-white text-xs">
+                                  {unreadCount}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* Chat Interface */}
-        <Card className="lg:col-span-2 flex flex-col">
-          {selectedSender && (
-            <>
-              {/* Chat Header */}
-              <CardHeader className="border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={undefined as unknown as string} />
-                      <AvatarFallback>
-                        {selectedSender.sender.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-medium">
-                        {selectedSender.sender.name}
-                      </h3>
-                      <p className="text-sm text-green-600">Online</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="icon">
-                      <Phone className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon">
-                      <Info className="h-4 w-4" />
-                    </Button>
-                  </div>
+                    );
+                  })}
                 </div>
-              </CardHeader>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
 
-              {/* Messages */}
-              <CardContent className="flex-1 p-0">
-                <ScrollArea className="h-[400px] p-4">
-                  <div className="space-y-4">
-                    {displayMessages.map((message) => (
+        {/* ✅ Chat Interface */}
+        {(selectedSenderId || selectedSender) && (
+          <Card className="lg:col-span-2 flex flex-col block">
+            {/* Header */}
+            <CardHeader className="border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {/* 🔙 Back button for mobile */}
+                <button
+                  className="lg:hidden text-gray-600 hover:text-gray-900"
+                  onClick={() => setSelectedSenderId(null)}
+                >
+                  ←
+                </button>
+
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={undefined as unknown as string} />
+                  <AvatarFallback>
+                    {selectedSender?.sender?.name
+                      ?.split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-medium">
+                    {selectedSender?.sender?.name || "User"}
+                  </h3>
+                  <p className="text-sm text-green-600">Online</p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Button variant="ghost" size="icon">
+                  <Phone className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon">
+                  <Info className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+
+            {/* Messages */}
+            <CardContent className="flex-1 p-0">
+              <ScrollArea className="h-[400px] p-4">
+                <div className="space-y-4">
+                  {displayMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${
+                        message.isFromUser ? "justify-end" : "justify-start"
+                      }`}
+                    >
                       <div
-                        key={message.id}
-                        className={`flex ${
-                          message.isFromUser ? "justify-end" : "justify-start"
+                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                          message.isFromUser
+                            ? "bg-amber-100 text-gray-900"
+                            : "bg-gray-100 text-gray-900"
                         }`}
                       >
-                        <div
-                          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                            message.isFromUser
-                              ? "bg-amber-100 text-gray-900"
-                              : "bg-gray-100 text-gray-900"
-                          }`}
-                        >
-                          {Array.isArray(message.attachments) &&
-                            message.attachments.length > 0 && (
-                              <div className="mb-2 space-y-2">
-                                {message.attachments.map((att, idx) => {
-                                  const attObj =
-                                    typeof att === "string"
-                                      ? { url: att }
-                                      : att || {};
-                                  const url = attObj.url as string | undefined;
-                                  const name =
-                                    (attObj.name as string) ||
-                                    url ||
-                                    "Attachment";
-                                  const isImage = url
-                                    ? /(png|jpg|jpeg|gif|webp)$/i.test(url)
-                                    : false;
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className="border rounded bg-white p-2"
-                                    >
-                                      {url && isImage ? (
-                                        <img
-                                          src={url}
-                                          alt={name}
-                                          className="max-h-40 rounded object-cover"
-                                        />
-                                      ) : (
-                                        <div className="flex items-center gap-2 text-sm">
-                                          <Paperclip className="h-4 w-4" />
-                                          <a
-                                            href={url || "#"}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="underline"
-                                          >
-                                            {name}
-                                          </a>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          <p className="text-sm">{message.text}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {message.timestamp}
-                          </p>
-                        </div>
+                        {Array.isArray(message.attachments) &&
+                          message.attachments.length > 0 && (
+                            <div className="mb-2 space-y-2">
+                              {message.attachments.map((att, idx) => {
+                                const attObj =
+                                  typeof att === "string" ? { url: att } : att;
+                                const url = attObj.url as string | undefined;
+                                const name =
+                                  (attObj.name as string) ||
+                                  url ||
+                                  "Attachment";
+                                const isImage = url
+                                  ? /(png|jpg|jpeg|gif|webp)$/i.test(url)
+                                  : false;
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="border rounded bg-white p-2"
+                                  >
+                                    {url && isImage ? (
+                                      <img
+                                        src={url}
+                                        alt={name}
+                                        className="max-h-40 rounded object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <Paperclip className="h-4 w-4" />
+                                        <a
+                                          href={url || "#"}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="underline"
+                                        >
+                                          {name}
+                                        </a>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        <p className="text-sm">{message.text}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {message.timestamp}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-
-              {/* Message Input */}
-              <div className="border-t border-gray-200 p-4">
-                <div className="flex items-center space-x-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    onChange={handleFilesSelected}
-                    className="hidden"
-                  />
-                  <Button variant="ghost" size="icon" onClick={handlePickFiles}>
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    placeholder="Type your message here..."
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={
-                      !messageText.trim() && pendingAttachments.length === 0
-                    }
-                    className="bg-amber-700 hover:bg-amber-800 text-white"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
+                    </div>
+                  ))}
                 </div>
-                {pendingAttachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {pendingAttachments.map((file, idx) => (
-                      <div
-                        key={`${file.name}-${idx}`}
-                        className="flex items-center gap-2 px-2 py-1 rounded border text-xs bg-white"
-                      >
-                        <Paperclip className="h-3 w-3" />
-                        <span
-                          className="truncate max-w-[200px]"
-                          title={file.name}
-                        >
-                          {file.name}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2"
-                          onClick={() => handleRemoveAttachment(idx)}
-                        >
-                          ✕
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              </ScrollArea>
+            </CardContent>
+
+            {/* Input */}
+            <div className="border-t border-gray-200 p-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFilesSelected}
+                  className="hidden"
+                />
+                <Button variant="ghost" size="icon" onClick={handlePickFiles}>
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+                <Input
+                  placeholder="Type your message here..."
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={
+                    !messageText.trim() && pendingAttachments.length === 0
+                  }
+                  className="bg-amber-700 hover:bg-amber-800 text-white"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
               </div>
-            </>
-          )}
-        </Card>
+
+              {pendingAttachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {pendingAttachments.map((file, idx) => (
+                    <div
+                      key={`${file.name}-${idx}`}
+                      className="flex items-center gap-2 px-2 py-1 rounded border text-xs bg-white"
+                    >
+                      <Paperclip className="h-3 w-3" />
+                      <span
+                        className="truncate max-w-[200px]"
+                        title={file.name}
+                      >
+                        {file.name}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2"
+                        onClick={() => handleRemoveAttachment(idx)}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -64,7 +64,7 @@ export async function fetchMyProducts(token?: string): Promise<MyProduct[]> {
   });
   if (!response.ok) throw new Error("Failed to fetch my products");
   const json = await response.json();
-  // console.log("my products", json);
+  console.log("my products", json);
   const list: ProductApi[] =
     json?.data?.products ?? json?.products ?? json?.data ?? [];
   const withValidId = Array.isArray(list)
@@ -387,10 +387,10 @@ export interface CreateProductData {
   sellerId: string;
   title: string;
   description: string;
-  categoryId: string; // Backend expects categoryId (the actual ID)
+  categoryId: string;
   price: number;
   stock: number;
-  images: string[];
+  images?: (File | string)[]; // can handle File objects or URLs (optional)
   freeShipping?: boolean;
   condition?: "new" | "used";
   isAuction?: boolean;
@@ -403,23 +403,32 @@ export async function createProduct(
 ): Promise<Product> {
   const url = `${BASE_URL}/api/v1/products`;
 
-  // console.log("Creating product with data:", data);
-  // console.log("Using token:", token ? "Present" : "Missing");
+  const formData = new FormData();
+  formData.append("sellerId", data.sellerId);
+  formData.append("title", data.title);
+  formData.append("description", data.description);
+  formData.append("categoryId", data.categoryId);
+  formData.append("price", String(data.price));
+  formData.append("stock", String(data.stock));
+
+  if (data.freeShipping !== undefined)
+    formData.append("freeShipping", String(data.freeShipping));
+  if (data.condition) formData.append("condition", data.condition);
+  if (data.isAuction !== undefined)
+    formData.append("isAuction", String(data.isAuction));
+  if (data.auctionEndDate)
+    formData.append("auctionEndDate", data.auctionEndDate);
+
+  // ✅ Append actual image files (NOT URLs)
+  data.images.forEach((file) => {
+    formData.append("images", file);
+  });
 
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(data),
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
   });
-
-  // console.log("Response status:", response.status);
-  // console.log(
-  //   "Response headers:",
-  //   Object.fromEntries(response.headers.entries())
-  // );
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -430,7 +439,44 @@ export async function createProduct(
   }
 
   const json = await response.json();
-  // console.log("Success response:", json);
   const productData = json?.data ?? json;
-  return mapProduct(productData);
+  return mapProduct(productData.product || productData);
 }
+
+// lib/api/products.ts
+export const searchProducts = async (query: string) => {
+  const res = await fetch(
+    `${BASE_URL}/api/v1/products/search?q=${encodeURIComponent(query)}`
+  );
+
+  if (!res.ok) {
+    throw new Error("Failed to search products");
+  }
+
+  const json = await res.json();
+
+  // console.log("Search API response:", json);
+
+  // Extract the products array correctly
+  const rawProducts =
+    json?.data?.products ||
+    (Array.isArray(json.data) ? json.data : []) ||
+    (Array.isArray(json.products) ? json.products : []) ||
+    [];
+
+  // Normalize each product to match expected Product type
+  const normalizedProducts = rawProducts.map((p: any) => ({
+    id: p.id || p._id || p.productId,
+    title: p.title || p.name || "Untitled Product",
+    price: p.price ?? 0,
+    image:
+      p.image ||
+      p.imageUrl ||
+      (Array.isArray(p.images) ? p.images[0] : undefined) ||
+      "/placeholder.png",
+  }));
+
+  // console.log("Search results:", normalizedProducts);
+
+  return { products: normalizedProducts, results: normalizedProducts.length };
+};

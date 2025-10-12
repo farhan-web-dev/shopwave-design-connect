@@ -20,6 +20,8 @@ import {
   type ProductsListResponse,
 } from "@/lib/api/products";
 import { fetchCategories, type Category } from "@/lib/api/categories";
+import { useLocation } from "react-router-dom";
+import { searchProducts } from "@/lib/api/products";
 
 const categories = [
   "Electronics",
@@ -48,6 +50,11 @@ const Products = () => {
   const [freeShipping, setFreeShipping] = useState(false);
   const [express, setExpress] = useState(false);
 
+  // inside Products component
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const searchQuery = searchParams.get("search") || "";
+
   const { data: categoriesData } = useQuery<Category[]>({
     queryKey: ["categories"],
     queryFn: fetchCategories,
@@ -64,19 +71,27 @@ const Products = () => {
         selectedCategoryIds,
         freeShipping,
         express,
+        searchQuery,
       },
     ],
-    queryFn: () =>
-      fetchProducts({
-        page,
-        limit,
-        sort,
-        minPrice: priceRange[0],
-        maxPrice: priceRange[1],
-        categoryIds: selectedCategoryIds,
-        freeShipping,
-        express,
-      }),
+    queryFn: () => {
+      if (searchQuery) {
+        // If searching, use searchProducts()
+        return searchProducts(searchQuery);
+      } else {
+        // Otherwise, fetch normally
+        return fetchProducts({
+          page,
+          limit,
+          sort,
+          minPrice: priceRange[0],
+          maxPrice: priceRange[1],
+          categoryIds: selectedCategoryIds,
+          freeShipping,
+          express,
+        });
+      }
+    },
   });
 
   console.log(data);

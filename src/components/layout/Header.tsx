@@ -28,6 +28,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import HeaderSearchBar from "../HeaderSearchBar";
 
 const Header = () => {
   const { isAuthenticated, user, token, logout } = useAuth();
@@ -72,7 +73,7 @@ const Header = () => {
             </span> */}
           </Link>
 
-          {/* Search Bar */}
+          {/* Search Bar
           <div className="hidden md:flex flex-1 max-w-xl mx-8">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -82,7 +83,8 @@ const Header = () => {
                 className="pl-10 w-full"
               />
             </div>
-          </div>
+          </div> */}
+          <HeaderSearchBar />
 
           {/* Navigation Icons (desktop) */}
           <div className="hidden md:flex items-center space-x-4">

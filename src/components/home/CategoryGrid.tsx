@@ -10,6 +10,7 @@ import {
   Shirt,
   Camera,
   Tag,
+  Factory, // 👈 Added this for Manufacturers
 } from "lucide-react";
 
 const CategoryGrid = () => {
@@ -42,9 +43,8 @@ const CategoryGrid = () => {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {(categories ?? []).map((category, index) => {
             const displayName = category.name;
-
-            // Icon/color mapping based on common category names; fallback provided
             const keyName = (category.slug || displayName || "").toLowerCase();
+
             type IconType = React.ComponentType<{ className?: string }>;
             const iconColorMap: Record<
               string,
@@ -63,6 +63,7 @@ const CategoryGrid = () => {
               apparel: { Icon: Shirt, color: "bg-pink-100" },
               cameras: { Icon: Camera, color: "bg-yellow-100" },
               photography: { Icon: Camera, color: "bg-yellow-100" },
+              manufacturers: { Icon: Factory, color: "bg-slate-100" }, // 👈 Added Manufacturers
             };
 
             const defaultColors = [
@@ -82,7 +83,6 @@ const CategoryGrid = () => {
               defaultColors[index % defaultColors.length] ||
               "bg-muted";
 
-            // Ensure unique/stable key
             const keyValue = String(
               category.id ?? category.slug ?? category.name ?? index
             );
@@ -98,7 +98,6 @@ const CategoryGrid = () => {
                   <div
                     className={`${colorClass} w-16 h-16 rounded-full flex items-center justify-center mb-3 mx-auto`}
                   >
-                    {/* Prefer backend image if provided; else mapped icon */}
                     {category.imageUrl ? (
                       <img
                         src={category.imageUrl}

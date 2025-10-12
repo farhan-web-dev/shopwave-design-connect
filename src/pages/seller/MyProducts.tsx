@@ -220,12 +220,15 @@ const MyProducts = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">My Products</h1>
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          My Products
+        </h1>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <StatsCard
           title="Total Active Products"
           value={isLoading ? "-" : String(stats.totalActive)}
@@ -249,19 +252,22 @@ const MyProducts = () => {
       {/* Products Table */}
       <Card className="bg-white shadow-sm">
         <CardHeader>
-          <CardTitle>All Products</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">All Products</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Make table scrollable horizontally on mobile */}
           <div className="overflow-x-auto">
-            <Table className="min-w-full">
+            <Table className="min-w-full text-sm">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">Image</TableHead>
-                  <TableHead className="min-w-[200px]">Name</TableHead>
-                  <TableHead className="w-32">Category</TableHead>
+                  <TableHead className="min-w-[180px] sm:min-w-[200px]">
+                    Name
+                  </TableHead>
+                  <TableHead className="w-28 sm:w-32">Category</TableHead>
                   <TableHead className="w-20">Price</TableHead>
                   <TableHead className="w-16">Stock</TableHead>
-                  <TableHead className="w-28">Status</TableHead>
+                  <TableHead className="w-24 sm:w-28">Status</TableHead>
                   <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -313,21 +319,11 @@ const MyProducts = () => {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="font-medium">
-                        <div
-                          className="truncate max-w-[200px]"
-                          title={product.title}
-                        >
-                          {product.title}
-                        </div>
+                      <TableCell className="font-medium max-w-[150px] sm:max-w-[200px] truncate">
+                        {product.title}
                       </TableCell>
-                      <TableCell className="text-sm">
-                        <div
-                          className="truncate"
-                          title={product.category || "-"}
-                        >
-                          {product.category || "-"}
-                        </div>
+                      <TableCell className="text-sm truncate">
+                        {product.category || "-"}
                       </TableCell>
                       <TableCell className="font-semibold text-sm">
                         {typeof product.price === "number"
@@ -345,14 +341,14 @@ const MyProducts = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center gap-1 sm:gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0"
                             onClick={() => handleEditProduct(product)}
                           >
-                            <Edit className="h-3 w-3" />
+                            <Edit className="h-3.5 w-3.5" />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -361,7 +357,7 @@ const MyProducts = () => {
                                 size="sm"
                                 className="h-8 w-8 p-0"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -370,9 +366,8 @@ const MyProducts = () => {
                                   Are you sure?
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This action cannot be undone. This will
-                                  permanently delete the product "
-                                  {product.title}".
+                                  This will permanently delete "{product.title}
+                                  ".
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -400,60 +395,49 @@ const MyProducts = () => {
 
       {/* Floating Add Product Button */}
       <Link to="/seller/products/add">
-        <Button className="fixed bottom-6 right-6 bg-amber-700 hover:bg-amber-800 text-white shadow-lg">
+        <Button className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 bg-amber-700 hover:bg-amber-800 text-white shadow-lg px-4 py-2 sm:px-5 sm:py-2">
           <Plus className="h-4 w-4 mr-2" />
-          Add Product
+          <span className="hidden sm:inline">Add Product</span>
         </Button>
       </Link>
 
       {/* Edit Product Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] w-[90vw]">
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
             <DialogDescription>
-              Make changes to your product here. Click save when you're done.
+              Make changes to your product here.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">
-                Title
-              </Label>
-              <Input
-                id="title"
-                value={editFormData.title || ""}
-                onChange={(e) => handleEditFormChange("title", e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="price" className="text-right">
-                Price
-              </Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                value={editFormData.price || ""}
-                onChange={(e) => handleEditFormChange("price", e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="stock" className="text-right">
-                Stock
-              </Label>
-              <Input
-                id="stock"
-                type="number"
-                value={editFormData.stock || ""}
-                onChange={(e) => handleEditFormChange("stock", e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="category" className="text-right">
+            {[
+              { id: "title", label: "Title", type: "text" },
+              { id: "price", label: "Price", type: "number" },
+              { id: "stock", label: "Stock", type: "number" },
+            ].map((field) => (
+              <div
+                key={field.id}
+                className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4"
+              >
+                <Label htmlFor={field.id} className="sm:text-right">
+                  {field.label}
+                </Label>
+                <Input
+                  id={field.id}
+                  type={field.type}
+                  value={(editFormData as any)[field.id] || ""}
+                  onChange={(e) =>
+                    handleEditFormChange(field.id as any, e.target.value)
+                  }
+                  className="sm:col-span-3"
+                />
+              </div>
+            ))}
+
+            {/* Category */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="category" className="sm:text-right">
                 Category
               </Label>
               <Select
@@ -462,7 +446,7 @@ const MyProducts = () => {
                   handleEditFormChange("categoryId", value)
                 }
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger className="sm:col-span-3">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -474,15 +458,17 @@ const MyProducts = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="image" className="text-right">
+
+            {/* Image URL */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
+              <Label htmlFor="image" className="sm:text-right">
                 Image URL
               </Label>
               <Input
                 id="image"
                 value={editFormData.image || ""}
                 onChange={(e) => handleEditFormChange("image", e.target.value)}
-                className="col-span-3"
+                className="sm:col-span-3"
               />
             </div>
           </div>

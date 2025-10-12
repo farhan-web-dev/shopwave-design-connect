@@ -29,7 +29,9 @@ const addProductSchema = z.object({
   categoryId: z.string().min(1, "Category is required"), // Backend expects categoryId
   price: z.number().min(0, "Price must be positive"),
   stock: z.number().min(0, "Stock must be non-negative"),
-  images: z.array(z.string()).min(1, "At least one image is required"),
+  images: z.any().refine((val) => val && val.length > 0, {
+    message: "At least one image is required",
+  }),
   freeShipping: z.boolean().optional(),
   condition: z.enum(["new", "used"]).optional(),
   isAuction: z.boolean().optional(),
@@ -42,7 +44,8 @@ const AddProduct = () => {
   const navigate = useNavigate();
   const { user, token } = useAuth();
   const { toast } = useToast();
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  // const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
 
   const {
     register,
@@ -143,7 +146,7 @@ const AddProduct = () => {
       return;
     }
 
-    if (imageUrls.length === 0) {
+    if (imageFiles.length === 0) {
       toast({
         title: "Error",
         description: "Please upload at least one image",
@@ -159,7 +162,7 @@ const AddProduct = () => {
       categoryId: data.categoryId, // Backend expects categoryId (the actual ID)
       price: data.price,
       stock: data.stock,
-      images: imageUrls,
+      images: imageFiles,
       freeShipping: data.freeShipping,
       condition: data.condition,
       isAuction: data.isAuction,
@@ -172,14 +175,17 @@ const AddProduct = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Add New Product</h1>
-        <p className="text-gray-600 mt-2">
+      {/* Header */}
+      <div className="text-center md:text-left">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          Add New Product
+        </h1>
+        <p className="text-gray-600 mt-2 text-sm md:text-base">
           Fill out the details to list your new product on your store.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pb-10">
         <Card className="bg-white shadow-sm">
           <CardHeader>
             <CardTitle>Product Information</CardTitle>
@@ -215,33 +221,15 @@ const AddProduct = () => {
                     }
                   />
                 </SelectTrigger>
-                <SelectContent>
-                  {categoriesLoading ? (
-                    <div className="px-2 py-1.5 text-sm text-gray-500">
-                      Loading categories...
-                    </div>
-                  ) : displayCategories.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-gray-500">
-                      No categories available
-                    </div>
-                  ) : (
-                    displayCategories
-                      .filter(
-                        (category) =>
-                          category &&
-                          category.name &&
-                          (category.id !== undefined ||
-                            category._id !== undefined)
-                      )
-                      .map((category) => (
-                        <SelectItem
-                          key={String(category.id)}
-                          value={String(category.id)} // Use category ID as value
-                        >
-                          {category.name}
-                        </SelectItem>
-                      ))
-                  )}
+                <SelectContent className="max-h-60 overflow-y-auto">
+                  {displayCategories.map((category) => (
+                    <SelectItem
+                      key={String(category.id)}
+                      value={String(category.id)}
+                    >
+                      {category.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {errors.categoryId && (
@@ -251,12 +239,12 @@ const AddProduct = () => {
               )}
             </div>
 
-            {/* Price and Stock */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Price & Stock */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="price">Price</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
                     $
                   </span>
                   <Input
@@ -268,9 +256,6 @@ const AddProduct = () => {
                     className="pl-8"
                   />
                 </div>
-                {errors.price && (
-                  <p className="text-sm text-red-600">{errors.price.message}</p>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -281,37 +266,33 @@ const AddProduct = () => {
                   placeholder="0"
                   type="number"
                 />
-                {errors.stock && (
-                  <p className="text-sm text-red-600">{errors.stock.message}</p>
-                )}
               </div>
             </div>
 
-            {/* Product Images */}
+            {/* Images */}
             <div className="space-y-2">
               <Label>Product Images</Label>
               <ImageUpload
                 maxImages={5}
                 onImagesChange={(files) => {
-                  // Convert files to URLs (you might want to upload to a service first)
-                  const urls = files.map((file) => URL.createObjectURL(file));
-                  setImageUrls(urls);
-                  setValue("images", urls);
+                  setImageFiles(files);
+                  setValue("images", files, { shouldValidate: true }); // ✅ triggers Zod validation
                 }}
               />
+
               {errors.images && (
                 <p className="text-sm text-red-600">{errors.images.message}</p>
               )}
             </div>
 
-            {/* Product Description */}
+            {/* Description */}
             <div className="space-y-2">
               <Label htmlFor="description">Product Description</Label>
               <Textarea
                 id="description"
                 {...register("description")}
-                placeholder="Provide a comprehensive description of your product, including features, benefits, and specifications"
-                rows={6}
+                placeholder="Enter full product description"
+                rows={5}
               />
               {errors.description && (
                 <p className="text-sm text-red-600">
@@ -320,8 +301,8 @@ const AddProduct = () => {
               )}
             </div>
 
-            {/* Product Options */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Options */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="condition">Condition</Label>
                 <Select
@@ -337,28 +318,21 @@ const AddProduct = () => {
                     <SelectItem value="used">Used</SelectItem>
                   </SelectContent>
                 </Select>
-                {errors.condition && (
-                  <p className="text-sm text-red-600">
-                    {errors.condition.message}
-                  </p>
-                )}
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="freeShipping"
-                    checked={watch("freeShipping")}
-                    onCheckedChange={(checked) =>
-                      setValue("freeShipping", !!checked)
-                    }
-                  />
-                  <Label htmlFor="freeShipping">Free Shipping</Label>
-                </div>
+              <div className="flex items-center space-x-2 mt-4 sm:mt-8">
+                <Checkbox
+                  id="freeShipping"
+                  checked={watch("freeShipping")}
+                  onCheckedChange={(checked) =>
+                    setValue("freeShipping", !!checked)
+                  }
+                />
+                <Label htmlFor="freeShipping">Free Shipping</Label>
               </div>
             </div>
 
-            {/* Auction Options */}
+            {/* Auction */}
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -366,9 +340,7 @@ const AddProduct = () => {
                   checked={watch("isAuction")}
                   onCheckedChange={(checked) => {
                     setValue("isAuction", !!checked);
-                    if (!checked) {
-                      setValue("auctionEndDate", "");
-                    }
+                    if (!checked) setValue("auctionEndDate", "");
                   }}
                 />
                 <Label htmlFor="isAuction">This is an auction product</Label>
@@ -381,13 +353,7 @@ const AddProduct = () => {
                     id="auctionEndDate"
                     {...register("auctionEndDate")}
                     type="datetime-local"
-                    placeholder="Select auction end date"
                   />
-                  {errors.auctionEndDate && (
-                    <p className="text-sm text-red-600">
-                      {errors.auctionEndDate.message}
-                    </p>
-                  )}
                 </div>
               )}
             </div>
@@ -399,7 +365,7 @@ const AddProduct = () => {
           <Button
             type="submit"
             disabled={createProductMutation.isPending}
-            className="bg-amber-700 hover:bg-amber-800 text-white px-8"
+            className="w-full sm:w-auto bg-amber-700 hover:bg-amber-800 text-white px-6 py-2"
           >
             {createProductMutation.isPending ? "Creating..." : "Create Product"}
           </Button>

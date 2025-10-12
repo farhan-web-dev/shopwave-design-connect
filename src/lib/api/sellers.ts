@@ -7,6 +7,36 @@ export interface CreateSellerPayload {
   logo?: File;
 }
 
+export interface SellerInfo {
+  _id: string;
+  storeName: string;
+  storeAddress?: string;
+  description?: string;
+  logo?: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchSellerById(
+  sellerId: string
+): Promise<SellerInfo | null> {
+  try {
+    const response = await fetch(`${BASE_URL}/api/v1/sellers/user/${sellerId}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error("Failed to fetch seller information");
+    }
+    const data = await response.json();
+    return data?.data?.profile || data;
+  } catch (error) {
+    console.error("Error fetching seller:", error);
+    return null;
+  }
+}
+
 export async function createSellerProfile(
   payload: CreateSellerPayload,
   token: string

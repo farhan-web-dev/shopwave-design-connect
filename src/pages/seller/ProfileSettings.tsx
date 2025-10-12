@@ -1,11 +1,18 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  fetchSellerProfileByUser,
+  updateSellerProfile,
+} from "@/lib/api/seller";
 import * as z from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Upload,
@@ -13,43 +20,91 @@ import {
   Mail,
   Phone,
   MapPin,
-  DollarSign,
+  FileText,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
 const profileSchema = z.object({
-  companyName: z.string().min(1, "Company name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().min(1, "Phone number is required"),
-  address: z.string().min(1, "Address is required"),
-  monthlyCapacity: z.string().min(1, "Monthly capacity is required"),
+  storeName: z.string().min(1, "Store name is required"),
+  email: z
+    .string()
+    .refine((val) => val === "" || z.string().email().safeParse(val).success, {
+      message: "Invalid email address",
+    })
+    .optional(),
+  phoneNumber: z.string().optional(),
+  storeAddress: z.string().optional(),
+  description: z.string().optional(),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
 
 const ProfileSettings = () => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { token, user } = useAuth();
+  const queryClient = useQueryClient();
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  // Fetch seller profile
+  const {
+    data: profile,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["sellerProfile", user?.id],
+    queryFn: () => fetchSellerProfileByUser(user?.id || "", token),
+    enabled: !!user?.id && !!token,
+  });
+
+  // console.log("Profile:", profile);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    reset,
+    watch,
   } = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      companyName: "Acme Innovations Ltd.",
-      email: "contact@acmeinnovations.com",
-      phone: "+1 (555) 123-4567",
-      address: "123 Industrial Way, Tech City, TX 78701",
-      monthlyCapacity: "10000",
+      storeName: "",
+      email: "",
+      phoneNumber: "",
+      storeAddress: "",
+      description: "",
     },
   });
+
+  // Watch form values for debugging
+  const formValues = watch();
+  // console.log("Current form values:", formValues);
+
+  // Update form when profile data is loaded
+  React.useEffect(() => {
+    if (profile) {
+      // console.log("Resetting form with profile data:", profile);
+      reset({
+        storeName: profile.storeName || "",
+        email: profile.email || "",
+        phoneNumber: profile.phoneNumber || "",
+        storeAddress: profile.storeAddress || "",
+        description: profile.description || "",
+      });
+      if (profile.logo) {
+        setLogoPreview(profile.logo);
+      }
+    }
+  }, [profile, reset]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // console.log("Logo file selected:", {
+      //   name: file.name,
+      //   size: file.size,
+      //   type: file.type,
+      // });
       setLogoFile(file);
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -59,66 +114,106 @@ const ProfileSettings = () => {
     }
   };
 
-  const onSubmit = async (data: ProfileForm) => {
-    setIsSubmitting(true);
-    try {
-      const formData = new FormData();
-
-      // Append form fields
-      Object.entries(data).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
-
-      // Append logo if uploaded
-      if (logoFile) {
-        formData.append("logo", logoFile);
-      }
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: ProfileForm) => {
+      if (!profile) throw new Error("Profile not found");
+      const updateData = { ...data, logo: logoFile || undefined };
+      // console.log("Mutation function - Profile ID:", profile._id);
+      // console.log("Mutation function - Update data:", updateData);
+      // console.log("Mutation function - Token:", !!token);
+      return updateSellerProfile(profile._id, updateData, token);
+    },
+    onSuccess: (response) => {
+      // console.log("Update successful:", response);
+      queryClient.invalidateQueries({ queryKey: ["sellerProfile"] });
       toast.success("Profile updated successfully!");
-    } catch (error) {
+      setLogoFile(null);
+    },
+    onError: (error) => {
+      console.error("Update mutation error:", error);
       toast.error("Failed to update profile. Please try again.");
-      console.error("Error updating profile:", error);
-    } finally {
-      setIsSubmitting(false);
+    },
+  });
+
+  const onSubmit = async (data: ProfileForm) => {
+    if (!profile) {
+      toast.error("Profile not found");
+      return;
     }
+    // console.log("Form data being submitted:", data);
+    // console.log("Profile ID:", profile._id);
+    updateProfileMutation.mutate(data);
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading profile...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center">
+            <h2 className="text-xl font-semibold text-red-600 mb-2">
+              Error Loading Profile
+            </h2>
+            <p className="text-gray-600">
+              {error instanceof Error
+                ? error.message
+                : "Failed to load profile"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
         <p className="text-gray-600 mt-2">
-          Manage your company information, contact details, and monthly
-          capacity.
+          Manage your store information and contact details.
         </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card className="bg-white shadow-sm">
           <CardHeader>
-            <CardTitle>Company Information</CardTitle>
+            <CardTitle>Store Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Company Name */}
+            {/* Store Name */}
             <div className="space-y-2">
               <Label
-                htmlFor="companyName"
+                htmlFor="storeName"
                 className="flex items-center space-x-2"
               >
                 <Building2 className="h-4 w-4 text-gray-500" />
-                <span>Company Name</span>
+                <span>Store Name</span>
               </Label>
               <Input
-                id="companyName"
-                {...register("companyName")}
-                placeholder="Enter company name"
+                id="storeName"
+                {...register("storeName")}
+                placeholder="Enter store name"
               />
-              {errors.companyName && (
+              {errors.storeName && (
                 <p className="text-sm text-red-600">
-                  {errors.companyName.message}
+                  {errors.storeName.message}
                 </p>
               )}
             </div>
@@ -142,64 +237,74 @@ const ProfileSettings = () => {
 
             {/* Phone */}
             <div className="space-y-2">
-              <Label htmlFor="phone" className="flex items-center space-x-2">
+              <Label
+                htmlFor="phoneNumber"
+                className="flex items-center space-x-2"
+              >
                 <Phone className="h-4 w-4 text-gray-500" />
                 <span>Phone Number</span>
               </Label>
               <Input
-                id="phone"
-                {...register("phone")}
+                id="phoneNumber"
+                {...register("phoneNumber")}
                 placeholder="Enter phone number"
               />
-              {errors.phone && (
-                <p className="text-sm text-red-600">{errors.phone.message}</p>
+              {errors.phoneNumber && (
+                <p className="text-sm text-red-600">
+                  {errors.phoneNumber.message}
+                </p>
               )}
             </div>
 
-            {/* Address */}
-            <div className="space-y-2">
-              <Label htmlFor="address" className="flex items-center space-x-2">
-                <MapPin className="h-4 w-4 text-gray-500" />
-                <span>Address</span>
-              </Label>
-              <Input
-                id="address"
-                {...register("address")}
-                placeholder="Enter address"
-              />
-              {errors.address && (
-                <p className="text-sm text-red-600">{errors.address.message}</p>
-              )}
-            </div>
-
-            {/* Monthly Capacity */}
+            {/* Store Address */}
             <div className="space-y-2">
               <Label
-                htmlFor="monthlyCapacity"
+                htmlFor="storeAddress"
                 className="flex items-center space-x-2"
               >
-                <DollarSign className="h-4 w-4 text-gray-500" />
-                <span>Monthly Capacity (Units)</span>
+                <MapPin className="h-4 w-4 text-gray-500" />
+                <span>Store Address</span>
               </Label>
               <Input
-                id="monthlyCapacity"
-                {...register("monthlyCapacity")}
-                placeholder="Enter monthly capacity"
-                type="number"
+                id="storeAddress"
+                {...register("storeAddress")}
+                placeholder="Enter store address"
               />
-              {errors.monthlyCapacity && (
+              {errors.storeAddress && (
                 <p className="text-sm text-red-600">
-                  {errors.monthlyCapacity.message}
+                  {errors.storeAddress.message}
+                </p>
+              )}
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="description"
+                className="flex items-center space-x-2"
+              >
+                <FileText className="h-4 w-4 text-gray-500" />
+                <span>Store Description</span>
+              </Label>
+              <Textarea
+                id="description"
+                {...register("description")}
+                placeholder="Enter store description"
+                rows={4}
+              />
+              {errors.description && (
+                <p className="text-sm text-red-600">
+                  {errors.description.message}
                 </p>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Company Logo */}
+        {/* Store Logo */}
         <Card className="bg-white shadow-sm">
           <CardHeader>
-            <CardTitle>Company Logo</CardTitle>
+            <CardTitle>Store Logo</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
@@ -252,10 +357,17 @@ const ProfileSettings = () => {
         <div className="flex justify-end">
           <Button
             type="submit"
-            disabled={isSubmitting}
+            disabled={updateProfileMutation.isPending}
             className="bg-amber-700 hover:bg-amber-800 text-white px-8"
           >
-            {isSubmitting ? "Saving..." : "Save Changes"}
+            {updateProfileMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
           </Button>
         </div>
       </form>

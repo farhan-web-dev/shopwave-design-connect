@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { fetchCart, type CartData } from "@/lib/api/cart";
+import { getFavourites, type Favourite } from "@/lib/api/favourites";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,14 @@ const Header = () => {
   const cartCount =
     cartData?.items?.reduce((sum, it) => sum + it.quantity, 0) || 0;
 
+  const { data: favourites } = useQuery<Favourite[]>({
+    queryKey: ["favourites"],
+    queryFn: () => getFavourites(token!),
+    enabled: isAuthenticated && !!token,
+    staleTime: 5_000,
+  });
+  const favouritesCount = favourites?.length || 0;
+
   const handleLogout = () => {
     logout();
     navigate("/");
@@ -55,12 +64,12 @@ const Header = () => {
             <img
               src="/favicon.ico"
               alt="Invision"
-              className="h-8 w-8 rounded-lg shadow-sm"
+              className="h-12 w-16 rounded-lg shadow-sm"
             />
-            <span className="font-bold text-2xl md:text-3xl leading-none">
+            {/* <span className="font-bold text-2xl md:text-3xl leading-none">
               <span className="text-orange-500">E</span>
               nvision
-            </span>
+            </span> */}
           </Link>
 
           {/* Search Bar */}
@@ -80,8 +89,13 @@ const Header = () => {
             {isAuthenticated ? (
               <>
                 <Button variant="ghost" size="icon" asChild>
-                  <Link to="/favorites">
+                  <Link to="/favourites" className="relative">
                     <Heart className="h-5 w-5" />
+                    {favouritesCount > 0 && (
+                      <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
+                        {favouritesCount}
+                      </span>
+                    )}
                   </Link>
                 </Button>
                 <Button variant="ghost" size="icon" asChild>
@@ -164,9 +178,20 @@ const Header = () => {
                 <div className="mt-4 grid gap-3">
                   {isAuthenticated ? (
                     <>
-                      <Button variant="ghost" className="justify-start" asChild>
-                        <Link to="/favorites">
-                          <Heart className="h-4 w-4 mr-2" /> Favorites
+                      <Button
+                        variant="ghost"
+                        className="justify-between"
+                        asChild
+                      >
+                        <Link to="/favourites">
+                          <span className="flex items-center">
+                            <Heart className="h-4 w-4 mr-2" /> Favourites
+                          </span>
+                          {favouritesCount > 0 && (
+                            <span className="inline-flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
+                              {favouritesCount}
+                            </span>
+                          )}
                         </Link>
                       </Button>
                       <Button variant="ghost" className="justify-start" asChild>

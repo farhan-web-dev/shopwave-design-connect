@@ -15,6 +15,7 @@ import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import NotFound from "./pages/NotFound";
 import Checkout from "./pages/Checkout";
+import CheckoutSuccess from "./pages/CheckoutSuccess";
 import SellerOnboarding from "./pages/SellerOnboarding";
 import SellerLayout from "./components/seller/SellerLayout";
 import DashboardOverview from "./pages/seller/DashboardOverview";
@@ -23,6 +24,9 @@ import AddProduct from "./pages/seller/AddProduct";
 import OrdersReceived from "./pages/seller/OrdersReceived";
 import Messages from "./pages/seller/Messages";
 import ProfileSettings from "./pages/seller/ProfileSettings";
+import BuyerMessages from "./pages/Messages";
+import Favourites from "./pages/Favourites";
+import Orders from "./pages/Orders";
 
 const queryClient = new QueryClient();
 
@@ -97,6 +101,66 @@ const App = () => (
                     <Header />
                     <main className="flex-1">
                       <Checkout />
+                    </main>
+                    <Footer />
+                  </div>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/checkout/success"
+              element={
+                <ProtectedRoute>
+                  <div className="flex flex-col min-h-screen">
+                    <Header />
+                    <main className="flex-1">
+                      <CheckoutSuccess />
+                    </main>
+                    <Footer />
+                  </div>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/messages"
+              element={
+                <ProtectedRoute>
+                  <div className="flex flex-col min-h-screen">
+                    <Header />
+                    <main className="flex-1">
+                      <BuyerMessages />
+                    </main>
+                    <Footer />
+                  </div>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/favourites"
+              element={
+                <ProtectedRoute>
+                  <div className="flex flex-col min-h-screen">
+                    <Header />
+                    <main className="flex-1">
+                      <Favourites />
+                    </main>
+                    <Footer />
+                  </div>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute>
+                  <div className="flex flex-col min-h-screen">
+                    <Header />
+                    <main className="flex-1">
+                      <Orders />
                     </main>
                     <Footer />
                   </div>

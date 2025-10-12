@@ -5,8 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { addCartItem } from "@/lib/api/cart";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  addToFavourites,
+  removeFromFavourites,
+  getFavourites,
+  type Favourite,
+} from "@/lib/api/favourites";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useState } from "react";
 
 interface ProductCardProps {
   id: string;
@@ -31,6 +38,16 @@ const ProductCard = ({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isFavouriteLoading, setIsFavouriteLoading] = useState(false);
+
+  const { data: favourites } = useQuery<Favourite[]>({
+    queryKey: ["favourites"],
+    queryFn: () => getFavourites(token!),
+    enabled: isAuthenticated && !!token,
+  });
+
+  const isFavourite =
+    favourites?.some((fav) => fav.productId._id === id) || false;
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -45,6 +62,38 @@ const ProductCard = ({
       queryClient.invalidateQueries({ queryKey: ["cart"] });
     } catch (err) {
       toast.error("Failed to add to cart");
+    }
+  };
+
+  const handleToggleFavourite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+
+    if (!isAuthenticated) {
+      const next = encodeURIComponent(location.pathname + location.search);
+      navigate(`/login?next=${next}`);
+      return;
+    }
+
+    if (!token) return;
+
+    setIsFavouriteLoading(true);
+    try {
+      if (isFavourite) {
+        await removeFromFavourites(id, token);
+        toast.success("Removed from favourites");
+      } else {
+        await addToFavourites(id, token);
+        toast.success("Added to favourites");
+      }
+      queryClient.invalidateQueries({ queryKey: ["favourites"] });
+    } catch (err) {
+      toast.error(
+        isFavourite
+          ? "Failed to remove from favourites"
+          : "Failed to add to favourites"
+      );
+    } finally {
+      setIsFavouriteLoading(false);
     }
   };
   return (
@@ -66,12 +115,18 @@ const ProductCard = ({
               size="icon"
               variant="secondary"
               className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => {
-                e.preventDefault();
-                // Handle favorite toggle
-              }}
+              onClick={handleToggleFavourite}
+              disabled={isFavouriteLoading}
             >
-              <Heart className="h-4 w-4" />
+              {isFavouriteLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+              ) : (
+                <Heart
+                  className={`h-4 w-4 ${
+                    isFavourite ? "fill-red-500 text-red-500" : ""
+                  }`}
+                />
+              )}
             </Button>
           </div>
         </Link>

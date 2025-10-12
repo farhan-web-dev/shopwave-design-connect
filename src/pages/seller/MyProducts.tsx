@@ -77,7 +77,7 @@ const MyProducts = () => {
     queryKey: ["my-products"],
     queryFn: () => fetchMyProducts(token || undefined),
   });
-  console.log(products);
+  // console.log(products);
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["categories"],

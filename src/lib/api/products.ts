@@ -15,6 +15,10 @@ export interface ProductApi {
   category?: string | { name?: string; id?: string | number };
   categoryId?: string | number | { _id?: string | number; name?: string };
   badge?: string;
+  sellerId?:
+    | string
+    | number
+    | { _id?: string | number; id?: string | number; name?: string };
 }
 
 export interface Product {
@@ -23,10 +27,12 @@ export interface Product {
   description?: string;
   price: number;
   image: string;
+  images?: string[];
   stock?: number;
   category?: string;
   categoryId?: string;
   badge?: string;
+  sellerId?: string;
 }
 
 export interface FetchProductsParams {
@@ -58,7 +64,7 @@ export async function fetchMyProducts(token?: string): Promise<MyProduct[]> {
   });
   if (!response.ok) throw new Error("Failed to fetch my products");
   const json = await response.json();
-  console.log("my products", json);
+  // console.log("my products", json);
   const list: ProductApi[] =
     json?.data?.products ?? json?.products ?? json?.data ?? [];
   const withValidId = Array.isArray(list)
@@ -128,6 +134,7 @@ function mapProduct(api: ProductApi): Product {
     typeof api.price === "string" ? parseFloat(api.price) : api.price ?? 0;
   const image =
     api.image || api.imageUrl || (api.images && api.images[0]) || "";
+  const images = api.images || (api.image ? [api.image] : []);
   const description = api.description || "";
   const stock =
     typeof api.stock === "number"
@@ -165,16 +172,35 @@ function mapProduct(api: ProductApi): Product {
     }
     return undefined;
   })();
+  const mappedSellerId = (() => {
+    if (api.sellerId !== undefined && api.sellerId !== null) {
+      if (typeof api.sellerId === "object") {
+        const id =
+          (api.sellerId as { _id?: string | number })._id ||
+          (api.sellerId as { id?: string | number }).id;
+        if (id !== undefined && id !== null) return String(id);
+      } else if (
+        typeof api.sellerId === "string" ||
+        typeof api.sellerId === "number"
+      ) {
+        return String(api.sellerId);
+      }
+    }
+    return undefined;
+  })();
+
   return {
     id,
     title,
     description,
     price: priceNum,
     image,
+    images,
     stock,
     category: categoryName,
     categoryId: mappedCategoryId,
     badge: api.badge,
+    sellerId: mappedSellerId,
   };
 }
 
@@ -238,6 +264,42 @@ export async function fetchTrendingProducts(): Promise<Product[]> {
   return [];
 }
 
+export async function fetchProductsByCategory(
+  categoryId: string
+): Promise<Product[]> {
+  if (!categoryId) return [];
+
+  const response = await fetch(
+    `${BASE_URL}/api/v1/products/category/${categoryId}`,
+    {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return [];
+    }
+    throw new Error("Failed to fetch products by category");
+  }
+
+  const json = await response.json();
+  const list: ProductApi[] =
+    json?.data?.products ?? json?.products ?? json?.data ?? json;
+
+  if (Array.isArray(list)) {
+    const withValidId = list.filter(
+      (p) =>
+        p &&
+        ((p.id !== undefined && p.id !== null) ||
+          (p._id !== undefined && p._id !== null))
+    );
+    return withValidId.map(mapProduct);
+  }
+  return [];
+}
+
 export interface RatingResponse {
   rating: number; // average rating
   reviews: number; // total reviews count
@@ -261,7 +323,7 @@ export async function fetchProductRating(
     return { rating: 0, reviews: 0 };
   }
   const json = await response.json();
-  console.log("r", json);
+  // console.log("r", json);
   const rating =
     Number(json?.data?.averageRating ?? json?.averageRating ?? 0) || 0;
   const reviews =
@@ -341,8 +403,8 @@ export async function createProduct(
 ): Promise<Product> {
   const url = `${BASE_URL}/api/v1/products`;
 
-  console.log("Creating product with data:", data);
-  console.log("Using token:", token ? "Present" : "Missing");
+  // console.log("Creating product with data:", data);
+  // console.log("Using token:", token ? "Present" : "Missing");
 
   const response = await fetch(url, {
     method: "POST",
@@ -353,11 +415,11 @@ export async function createProduct(
     body: JSON.stringify(data),
   });
 
-  console.log("Response status:", response.status);
-  console.log(
-    "Response headers:",
-    Object.fromEntries(response.headers.entries())
-  );
+  // console.log("Response status:", response.status);
+  // console.log(
+  //   "Response headers:",
+  //   Object.fromEntries(response.headers.entries())
+  // );
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -368,7 +430,7 @@ export async function createProduct(
   }
 
   const json = await response.json();
-  console.log("Success response:", json);
+  // console.log("Success response:", json);
   const productData = json?.data ?? json;
   return mapProduct(productData);
 }

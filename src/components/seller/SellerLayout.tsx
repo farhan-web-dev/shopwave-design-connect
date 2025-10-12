@@ -123,11 +123,9 @@ const SellerLayout = ({ children }: SellerLayoutProps) => {
       <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4 sticky top-0 z-40">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <div className="h-8 w-8 rounded-lg bg-orange-500 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">★</span>
-            </div>
+            <img src="/logo.jpg" alt="Logo" className="h-8 w-8" />
             <span className="text-lg lg:text-xl font-bold text-gray-800">
-              SellerDashboardPro
+              SellerDashboard
             </span>
           </div>
 

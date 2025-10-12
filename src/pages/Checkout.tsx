@@ -2,11 +2,17 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchCart, type CartData } from "@/lib/api/cart";
+import {
+  createPaymentIntent,
+  type PaymentIntentRequest,
+} from "@/lib/api/payments";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StripeProvider } from "@/components/payments/StripeProvider";
+import { PaymentForm } from "@/components/payments/PaymentForm";
 import { toast } from "sonner";
 
 const Checkout = () => {
@@ -29,6 +35,16 @@ const Checkout = () => {
     country: "",
   });
 
+  const [paymentState, setPaymentState] = useState<{
+    clientSecret: string | null;
+    paymentIntentId: string | null;
+    isProcessing: boolean;
+  }>({
+    clientSecret: null,
+    paymentIntentId: null,
+    isProcessing: false,
+  });
+
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
@@ -49,9 +65,63 @@ const Checkout = () => {
     form.postalCode.trim() &&
     form.country.trim();
 
-  const handlePay = () => {
+  const handlePay = async () => {
     if (!isFormValid || items.length === 0) return;
-    toast.success("Payment processed successfully (demo)");
+
+    setPaymentState((prev) => ({ ...prev, isProcessing: true }));
+
+    try {
+      const paymentData: PaymentIntentRequest = {
+        amount: Math.round(total * 100), // Convert to cents
+        currency: "usd",
+        items: items.map((item) => ({
+          id: item.productId,
+          title: item.title,
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+        })),
+        shippingAddress: {
+          fullName: form.fullName,
+          email: form.email,
+          phone: form.phone,
+          address: form.address,
+          city: form.city,
+          state: form.state,
+          postalCode: form.postalCode,
+          country: form.country,
+        },
+      };
+
+      const paymentIntent = await createPaymentIntent(paymentData, token);
+
+      setPaymentState({
+        clientSecret: paymentIntent.clientSecret,
+        paymentIntentId: paymentIntent.paymentIntentId,
+        isProcessing: false,
+      });
+
+      toast.success("Payment form loaded successfully");
+    } catch (error) {
+      console.error("Payment intent creation failed:", error);
+      toast.error("Failed to initialize payment. Please try again.");
+      setPaymentState((prev) => ({ ...prev, isProcessing: false }));
+    }
+  };
+
+  const handlePaymentSuccess = (orderId: string) => {
+    toast.success("Payment completed successfully!");
+    // Redirect to success page or clear cart
+    window.location.href = `/checkout/success?order=${orderId}`;
+  };
+
+  const handlePaymentError = (error: string) => {
+    toast.error(error);
+    setPaymentState({
+      clientSecret: null,
+      paymentIntentId: null,
+      isProcessing: false,
+    });
   };
 
   return (
@@ -208,18 +278,36 @@ const Checkout = () => {
                     <span className="text-primary">${total.toFixed(2)}</span>
                   </div>
                 </div>
-                <Button
-                  className="w-full"
-                  size="lg"
-                  disabled={!isFormValid || items.length === 0}
-                  onClick={handlePay}
-                >
-                  Pay with Card
-                </Button>
-                {items.length === 0 && (
-                  <p className="text-xs text-center text-muted-foreground mt-3">
-                    Add items to proceed to payment.
-                  </p>
+                {paymentState.clientSecret ? (
+                  <StripeProvider clientSecret={paymentState.clientSecret}>
+                    <PaymentForm
+                      paymentIntentId={paymentState.paymentIntentId!}
+                      onSuccess={handlePaymentSuccess}
+                      onError={handlePaymentError}
+                    />
+                  </StripeProvider>
+                ) : (
+                  <>
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      disabled={
+                        !isFormValid ||
+                        items.length === 0 ||
+                        paymentState.isProcessing
+                      }
+                      onClick={handlePay}
+                    >
+                      {paymentState.isProcessing
+                        ? "Initializing Payment..."
+                        : "Pay with Card"}
+                    </Button>
+                    {items.length === 0 && (
+                      <p className="text-xs text-center text-muted-foreground mt-3">
+                        Add items to proceed to payment.
+                      </p>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchSellerStats } from "@/lib/api/seller";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatsCard } from "@/components/ui/stats-card";
-import { Package, ShoppingCart, DollarSign, MessageSquare } from "lucide-react";
+import { Package, ShoppingCart, DollarSign, Loader2 } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -14,46 +16,94 @@ import {
 } from "recharts";
 
 const DashboardOverview = () => {
-  const [salesData] = useState([
-    { month: "Jan", sales: 12000 },
-    { month: "Feb", sales: 15000 },
-    { month: "Mar", sales: 11000 },
-    { month: "Apr", sales: 16000 },
-    { month: "May", sales: 17500 },
-    { month: "Jun", sales: 18450 },
-  ]);
+  const { token } = useAuth();
+
+  const {
+    data: stats,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["sellerStats"],
+    queryFn: () => fetchSellerStats(token),
+    enabled: !!token,
+  });
+
+  // Transform sales data for the chart
+  const salesData = stats?.salesOverview
+    ? stats.salesOverview.labels.map((label, index) => ({
+        month: label,
+        sales: stats.salesOverview.data[index] || 0,
+      }))
+    : [];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Dashboard Overview
+          </h1>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading dashboard data...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Dashboard Overview
+          </h1>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center">
+            <h2 className="text-xl font-semibold text-red-600 mb-2">
+              Error Loading Dashboard
+            </h2>
+            <p className="text-gray-600">
+              {error instanceof Error
+                ? error.message
+                : "Failed to load dashboard data"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
+        <p className="text-gray-600 mt-1">
+          Your business performance at a glance
+        </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatsCard
           title="Total Products"
-          value="1,250"
+          value={stats?.totalProducts?.toString() || "0"}
           icon={Package}
-          trend={{ value: "2.5% from last month", type: "increase" }}
         />
         <StatsCard
           title="Orders Received"
-          value="85"
+          value={stats?.orders?.total?.toString() || "0"}
           icon={ShoppingCart}
-          subtitle="Pending: 12, Shipped: 43, Delivered: 30"
+          subtitle={`Pending: ${stats?.orders?.pending || 0}, Shipped: ${
+            stats?.orders?.shipped || 0
+          }, Delivered: ${stats?.orders?.delivered || 0}`}
         />
         <StatsCard
           title="Monthly Earnings"
-          value="$18,450"
+          value={`$${(stats?.monthlyEarnings || 0).toFixed(2)}`}
           icon={DollarSign}
-          trend={{ value: "5.8% from last month", type: "increase" }}
-        />
-        <StatsCard
-          title="New Messages"
-          value="7"
-          icon={MessageSquare}
-          trend={{ value: "10% from last month", type: "decrease" }}
         />
       </div>
 

@@ -76,13 +76,13 @@ const AddProduct = () => {
     queryFn: fetchCategories,
   });
 
-  // Debug logging
-  console.log("Categories state:", {
-    categories,
-    categoriesLoading,
-    categoriesError,
-    categoriesLength: categories.length,
-  });
+  // // Debug logging
+  // console.log("Categories state:", {
+  //   categories,
+  //   categoriesLoading,
+  //   categoriesError,
+  //   categoriesLength: categories.length,
+  // });
 
   // If categories are not loading and there's an error, show some test categories
   const displayCategories =
@@ -166,7 +166,7 @@ const AddProduct = () => {
       auctionEndDate: data.auctionEndDate,
     };
 
-    console.log("Submitting product data:", productData);
+    // console.log("Submitting product data:", productData);
     createProductMutation.mutate(productData);
   };
 

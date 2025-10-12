@@ -12,14 +12,14 @@ export interface Category {
 
 export async function fetchCategories(): Promise<Category[]> {
   const url = `${BASE_URL}/api/v1/categories`;
-  console.log("Fetching categories from:", url);
+  // console.log("Fetching categories from:", url);
 
   const response = await fetch(url, {
     method: "GET",
     headers: { "Content-Type": "application/json" },
   });
 
-  console.log("Categories API response status:", response.status);
+  // console.log("Categories API response status:", response.status);
 
   if (!response.ok) {
     console.error(
@@ -31,7 +31,7 @@ export async function fetchCategories(): Promise<Category[]> {
   }
 
   const json = await response.json();
-  console.log("Categories API response:", json);
+  // console.log("Categories API response:", json);
 
   // Try different possible response formats
   let categories: unknown[] = [];
@@ -46,7 +46,7 @@ export async function fetchCategories(): Promise<Category[]> {
     categories = json.categories;
   }
 
-  console.log("Extracted categories:", categories);
+  // console.log("Extracted categories:", categories);
 
   // Filter out invalid categories and ensure they have required fields
   const validCategories = categories.filter((category) => {
@@ -56,7 +56,7 @@ export async function fetchCategories(): Promise<Category[]> {
     return cat.name && (cat.id !== undefined || cat._id !== undefined);
   }) as Category[];
 
-  console.log("Valid categories:", validCategories);
+  // console.log("Valid categories:", validCategories);
 
   // Map backend categories to our interface format
   const mappedCategories = validCategories.map((category) => {
@@ -72,6 +72,6 @@ export async function fetchCategories(): Promise<Category[]> {
     } as Category;
   });
 
-  console.log("Mapped categories:", mappedCategories);
+  // console.log("Mapped categories:", mappedCategor/ies);
   return mappedCategories;
 }

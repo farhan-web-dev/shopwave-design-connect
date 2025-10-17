@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react";
+"use client";
+
+import { useMemo, useState, useEffect } from "react";
+import { useLocation, useParams } from "react-router-dom";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import ProductCard from "@/components/products/ProductCard";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,35 +16,26 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { SlidersHorizontal } from "lucide-react";
-import { useQueries, useQuery } from "@tanstack/react-query";
+
 import {
   fetchProducts,
   fetchProductRating,
+  searchProducts,
   type Product,
   type ProductsListResponse,
 } from "@/lib/api/products";
-import { fetchCategories, type Category } from "@/lib/api/categories";
-import { useLocation } from "react-router-dom";
-import { searchProducts } from "@/lib/api/products";
 
-const categories = [
-  "Electronics",
-  "Computers",
-  "Accessories",
-  "Home & Living",
-  "Fashion",
-  "Cameras",
-];
+import { fetchCategories, type Category } from "@/lib/api/categories";
 
 const Products = () => {
-  const [priceRange, setPriceRange] = useState([0, 1000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [priceRangePending, setPriceRangePending] = useState<[number, number]>([
     0, 1000,
   ]);
-  // Search removed; handled by header
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(12);
+  const [limit] = useState(12);
   const [sort, setSort] = useState<string>("");
+
   const [selectedCategoryIdsPending, setSelectedCategoryIdsPending] = useState<
     string[]
   >([]);
@@ -50,16 +45,33 @@ const Products = () => {
   const [freeShipping, setFreeShipping] = useState(false);
   const [express, setExpress] = useState(false);
 
-  // inside Products component
+  // 🔹 Get search query and category from URL
   const location = useLocation();
+
   const searchParams = new URLSearchParams(location.search);
   const searchQuery = searchParams.get("search") || "";
+  const categoryParam = searchParams.get("category") || ""; // e.g. ?category=68f1326cc3242eceb1e42e22
 
+  // 🔹 Fetch all categories
   const { data: categoriesData } = useQuery<Category[]>({
     queryKey: ["categories"],
     queryFn: fetchCategories,
   });
 
+  // 🔹 Filter only main categories (no parent)
+  const mainCategories = useMemo(() => {
+    return (categoriesData ?? []).filter((c) => !c.parentCategoryId);
+  }, [categoriesData]);
+
+  // 🔹 If category is in URL, pre-select it
+  useEffect(() => {
+    if (categoryParam) {
+      setSelectedCategoryIds([categoryParam]);
+      setSelectedCategoryIdsPending([categoryParam]);
+    }
+  }, [categoryParam]);
+
+  // 🔹 Fetch products
   const { data, isLoading, isError } = useQuery<ProductsListResponse>({
     queryKey: [
       "products",
@@ -76,10 +88,8 @@ const Products = () => {
     ],
     queryFn: () => {
       if (searchQuery) {
-        // If searching, use searchProducts()
         return searchProducts(searchQuery);
       } else {
-        // Otherwise, fetch normally
         return fetchProducts({
           page,
           limit,
@@ -94,7 +104,6 @@ const Products = () => {
     },
   });
 
-  console.log(data);
   const items: Product[] = data?.products ?? [];
   const total = data?.results ?? items.length;
 
@@ -110,7 +119,7 @@ const Products = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Filters Sidebar */}
+          {/* 🧭 Filters Sidebar */}
           <aside className="lg:w-64 space-y-6">
             <div>
               <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
@@ -118,21 +127,12 @@ const Products = () => {
                 Filters
               </h3>
 
-              {/* Search removed: handled by header */}
-
-              {/* Categories */}
+              {/* 📦 Categories */}
               <div className="mb-6">
                 <Label className="mb-3 block font-medium">Categories</Label>
                 <div className="space-y-2">
-                  {(categoriesData ?? []).map((c: Category) => {
-                    const id = String(
-                      (
-                        c as unknown as {
-                          _id?: string | number;
-                          id?: string | number;
-                        }
-                      )._id ?? c.id
-                    );
+                  {mainCategories.map((c: Category) => {
+                    const id = String(c._id || c.id);
                     const checked = selectedCategoryIdsPending.includes(id);
                     return (
                       <div key={id} className="flex items-center space-x-2">
@@ -160,7 +160,7 @@ const Products = () => {
                 </div>
               </div>
 
-              {/* Price Range */}
+              {/* 💰 Price Range */}
               <div className="mb-6">
                 <Label className="mb-3 block font-medium">Price Range</Label>
                 <Slider
@@ -178,7 +178,7 @@ const Products = () => {
                 </div>
               </div>
 
-              {/* Shipping Options */}
+              {/* 🚚 Shipping Options */}
               <div className="mb-6">
                 <Label className="mb-3 block font-medium">
                   Shipping Options
@@ -213,6 +213,7 @@ const Products = () => {
                 </div>
               </div>
 
+              {/* ⚙️ Buttons */}
               <Button
                 className="w-full"
                 onClick={() => {
@@ -246,11 +247,11 @@ const Products = () => {
             </div>
           </aside>
 
-          {/* Products Grid */}
+          {/* 🛒 Products Grid */}
           <main className="flex-1">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold">
-                All Products
+                Products
                 <span className="text-muted-foreground text-base ml-2">
                   ({total} items)
                 </span>
@@ -297,7 +298,7 @@ const Products = () => {
                 })}
             </div>
 
-            {/* Pagination */}
+            {/* 🔁 Pagination */}
             <div className="flex justify-center mt-12 gap-2">
               <Button
                 variant="outline"

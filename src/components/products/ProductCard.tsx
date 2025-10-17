@@ -96,6 +96,7 @@ const ProductCard = ({
       setIsFavouriteLoading(false);
     }
   };
+
   return (
     <Card className="group hover:shadow-lg transition-shadow">
       <CardContent className="p-0">
@@ -107,23 +108,23 @@ const ProductCard = ({
               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
             />
             {badge && (
-              <Badge className="absolute top-2 left-2" variant="secondary">
+              <Badge className="absolute top-2 left-2 bg-orange-500 text-white">
                 {badge}
               </Badge>
             )}
             <Button
               size="icon"
               variant="secondary"
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 hover:bg-black/70 text-white"
               onClick={handleToggleFavourite}
               disabled={isFavouriteLoading}
             >
               {isFavouriteLoading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
               ) : (
                 <Heart
                   className={`h-4 w-4 ${
-                    isFavourite ? "fill-red-500 text-red-500" : ""
+                    isFavourite ? "fill-orange-500 text-orange-500" : ""
                   }`}
                 />
               )}
@@ -133,7 +134,7 @@ const ProductCard = ({
 
         <div className="p-4">
           <Link to={`/products/${id}`}>
-            <h3 className="font-medium text-sm mb-1 line-clamp-2 hover:text-primary">
+            <h3 className="font-medium text-sm mb-1 line-clamp-2 hover:text-orange-500 transition-colors">
               {title}
             </h3>
           </Link>
@@ -147,12 +148,15 @@ const ProductCard = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-lg font-bold text-primary">
+            <span className="text-lg font-bold text-orange-500">
               ${price.toFixed(2)}
             </span>
-            <Button size="sm" onClick={handleAddToCart}>
-              <ShoppingCart className="h-4 w-4 mr-1" />
-              Add
+            <Button
+              size="sm"
+              onClick={handleAddToCart}
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              <ShoppingCart className="h-4 w-4 mr-1" />+
             </Button>
           </div>
         </div>

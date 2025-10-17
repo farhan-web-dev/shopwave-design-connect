@@ -96,7 +96,7 @@ const Home = () => {
       </section>
 
       {/* Promotional Banner */}
-      <section className="bg-primary text-white py-16 my-12">
+      <section className="bg-orange-400 text-white py-16 my-12">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-4xl font-bold mb-4">Limited Time Offer!</h2>
           <p className="text-xl mb-6 text-white/90">

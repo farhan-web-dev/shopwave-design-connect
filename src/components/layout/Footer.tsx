@@ -95,7 +95,7 @@ const Footer = () => {
         </div> */}
 
       <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-        <p>&copy; 2025 CommerceHub. All rights reserved.</p>
+        <p>&copy; 2025 Envision. All rights reserved.</p>
       </div>
     </footer>
   );

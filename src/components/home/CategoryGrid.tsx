@@ -10,7 +10,7 @@ import {
   Shirt,
   Camera,
   Tag,
-  Factory, // 👈 Added this for Manufacturers
+  Factory, // 👈 For Manufacturers
 } from "lucide-react";
 
 const CategoryGrid = () => {
@@ -22,6 +22,11 @@ const CategoryGrid = () => {
     queryKey: ["categories"],
     queryFn: fetchCategories,
   });
+
+  // ✅ Only show main categories
+  const mainCategories = (categories ?? []).filter(
+    (category) => category.parentCategoryId === null
+  );
 
   return (
     <section className="container mx-auto px-4 py-12">
@@ -41,7 +46,7 @@ const CategoryGrid = () => {
 
       {!isLoading && !isError && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {(categories ?? []).map((category, index) => {
+          {mainCategories.map((category, index) => {
             const displayName = category.name;
             const keyName = (category.slug || displayName || "").toLowerCase();
 
@@ -63,7 +68,7 @@ const CategoryGrid = () => {
               apparel: { Icon: Shirt, color: "bg-pink-100" },
               cameras: { Icon: Camera, color: "bg-yellow-100" },
               photography: { Icon: Camera, color: "bg-yellow-100" },
-              manufacturers: { Icon: Factory, color: "bg-slate-100" }, // 👈 Added Manufacturers
+              manufacturers: { Icon: Factory, color: "bg-slate-100" }, // ✅ For Manufacturers
             };
 
             const defaultColors = [

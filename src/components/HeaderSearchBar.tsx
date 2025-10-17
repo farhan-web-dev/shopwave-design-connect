@@ -26,7 +26,8 @@ const HeaderSearchBar = () => {
           className="pl-10 w-full"
         />
         <Button
-          className="ml-2 bg-blue-600 hover:bg-blue-700 text-white"
+          type="button"
+          className="ml-2 bg-amber-600 hover:bg-amber-700 text-white"
           onClick={handleSearch}
         >
           Search

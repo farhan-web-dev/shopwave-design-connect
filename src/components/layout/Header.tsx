@@ -6,13 +6,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchNotifications,
   markAllNotificationsRead,
   type Notification,
 } from "@/lib/api/notification";
-
 import {
   Search,
   ShoppingCart,
@@ -21,20 +20,13 @@ import {
   Bell,
   MessageSquare,
   Menu,
+  Grid,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
 import { fetchCart, type CartData } from "@/lib/api/cart";
 import { getFavourites, type Favourite } from "@/lib/api/favourites";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -43,16 +35,27 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import HeaderSearchBar from "../HeaderSearchBar";
+import { fetchCategories, type Category } from "@/lib/api/categories";
+import ShopByCategoryMenu from "../ShopByCategory";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@radix-ui/react-dropdown-menu";
 
 const Header = () => {
   const { isAuthenticated, user, token, logout } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
+  // Cart and Favourites
   const { data: cartData } = useQuery<CartData>({
     queryKey: ["cart", { token: !!token }],
     queryFn: () => fetchCart(token || undefined),
     enabled: !!token,
-    staleTime: 5_000,
+    staleTime: 5000,
   });
   const cartCount =
     cartData?.items?.reduce((sum, it) => sum + it.quantity, 0) || 0;
@@ -61,31 +64,20 @@ const Header = () => {
     queryKey: ["favourites"],
     queryFn: () => getFavourites(token!),
     enabled: isAuthenticated && !!token,
-    staleTime: 5_000,
+    staleTime: 5000,
   });
   const favouritesCount = favourites?.length || 0;
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
+  // Notifications
   const [openNotifications, setOpenNotifications] = useState(false);
-  const queryClient = useQueryClient();
-
-  // Fetch notifications
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ["notifications"],
     queryFn: () => fetchNotifications(token!),
     enabled: isAuthenticated && !!token,
     staleTime: 5000,
   });
-
-  console.log("Notifications:", notifications);
-
-  // Count unread
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // Mark all as read when modal opens
   const markReadMutation = useMutation({
     mutationFn: () => markAllNotificationsRead(token!),
     onSuccess: () => {
@@ -98,235 +90,325 @@ const Header = () => {
     markReadMutation.mutate();
   };
 
+  // Categories
+  const { data: categoriesData = [] } = useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+  });
+
+  // const mainCategories = categoriesData.filter(
+  //   (cat) => !cat.parentCategoryId || cat.parentCategoryId === null
+  // );
+
+  // const subCategories = (parentId: string) =>
+  //   categoriesData.filter(
+  //     (cat) =>
+  //       cat.parentCategoryId !== null && cat.parentCategoryId === parentId
+  //   );
+
+  // console.log("mainCategories header", mainCategories);
+  // console.log("subCategories header", subCategories);
+
+  // Shop by Category modal
+
+  const [openCategories, setOpenCategories] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background">
+    <header className="sticky top-0 z-50 w-full border-b bg-gray-900">
       <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-16 items-center justify-between text-gray-100">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <img
-              src="/favicon.ico"
-              alt="Invision"
-              className="h-12 w-16 rounded-lg shadow-sm"
-            />
-            {/* <span className="font-bold text-2xl md:text-3xl leading-none">
-              <span className="text-orange-500">E</span>
-              nvision
-            </span> */}
+            <span className="text-2xl font-bold flex items-center">
+              <span className="text-amber-500">e</span>
+              <span className="text-gray-100">nvision</span>
+            </span>
           </Link>
-
-          {/* Search Bar
-          <div className="hidden md:flex flex-1 max-w-xl mx-8">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search for products..."
-                className="pl-10 w-full"
-              />
-            </div>
-          </div> */}
+          {/* Shop by Category Button */}
+          <div className="relative ">
+            <Button
+              variant="outline"
+              className="flex  items-center border-none  hover:bg-amber-500/20 hover:text-amber-400 transition-colors bg-transparent text-white font-semibold transition"
+              onClick={() => setOpenCategories(!openCategories)}
+            >
+              <ChevronDown className="h-5 w-5" />
+              Shop by category
+            </Button>
+          </div>
           <HeaderSearchBar />
-
           {/* Navigation Icons (desktop) */}
-          <div className="hidden md:flex items-center space-x-4">
-            {isAuthenticated ? (
-              <>
-                <Button variant="ghost" size="icon" asChild>
-                  <Link to="/favourites" className="relative">
-                    <Heart className="h-5 w-5" />
-                    {favouritesCount > 0 && (
-                      <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
-                        {favouritesCount}
-                      </span>
-                    )}
-                  </Link>
-                </Button>
-                <Button variant="ghost" size="icon" asChild>
-                  <Link to="/messages">
-                    <MessageSquare className="h-5 w-5" />
-                  </Link>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleOpenNotifications}
+          <div className="hidden md:flex items-center space-x-4 text-gray-100">
+            {/* Favourites */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
+              onClick={() =>
+                isAuthenticated ? navigate("/favourites") : navigate("/login")
+              }
+            >
+              <div className="relative">
+                <Heart className="h-5 w-5 text-gray-100" />
+                {isAuthenticated && favouritesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1 flex items-center justify-center">
+                    {favouritesCount}
+                  </span>
+                )}
+              </div>
+            </Button>
+
+            {/* Messages */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
+              onClick={() =>
+                isAuthenticated ? navigate("/messages") : navigate("/login")
+              }
+            >
+              <MessageSquare className="h-5 w-5 text-gray-100" />
+            </Button>
+
+            {/* Notifications */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
+              onClick={() =>
+                isAuthenticated ? handleOpenNotifications() : navigate("/login")
+              }
+            >
+              <div className="relative">
+                <Bell className="h-5 w-5 text-gray-100" />
+                {isAuthenticated && unreadCount > 0 && (
+                  <span className="absolute -top-4 -right-3 rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+            </Button>
+
+            {/* Cart */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
+              onClick={() =>
+                isAuthenticated ? navigate("/cart") : navigate("/login")
+              }
+            >
+              <div className="relative">
+                <ShoppingCart className="h-5 w-5 text-gray-100" />
+                {isAuthenticated && cartCount > 0 && (
+                  <span className="absolute -top-4 -right-3 rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1 flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </div>
+            </Button>
+            {isAuthenticated && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
+                  >
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent
+                  align="end"
+                  className="w-56 bg-white text-gray-700 shadow-lg rounded-md border border-gray-200"
                 >
-                  <div className="relative">
-                    <Bell className="h-5 w-5" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-4 -right-3 inline-flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
-                        {unreadCount}
-                      </span>
-                    )}
+                  {/* User info */}
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <p className="text-sm font-medium">{user?.name}</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {user?.email}
+                    </p>
                   </div>
-                </Button>
 
-                <Button variant="ghost" size="icon" asChild>
-                  <Link to="/cart" className="relative">
-                    <ShoppingCart className="h-5 w-5" />
-                    {cartCount > 0 && (
-                      <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
-                        {cartCount}
-                      </span>
-                    )}
-                  </Link>
-                </Button>
+                  {/* Menu items */}
+                  <div className="py-1 flex flex-col px-4 gap-2">
+                    <DropdownMenuItem asChild className="hover:bg-gray-100">
+                      <Link to="/account" className="w-full">
+                        My Account
+                      </Link>
+                    </DropdownMenuItem>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <User className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <div className="px-2 py-2">
-                      <p className="text-sm font-medium">{user?.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {user?.email}
-                      </p>
-                    </div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link to="/account">My Account</Link>
+                    <DropdownMenuItem asChild className="hover:bg-gray-100">
+                      <Link to="/orders" className="w-full">
+                        My Orders
+                      </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link to="/orders">My Orders</Link>
-                    </DropdownMenuItem>
+
                     {user?.role === "seller" && (
-                      <DropdownMenuItem asChild>
-                        <Link to="/seller/dashboard">Seller Dashboard</Link>
+                      <DropdownMenuItem asChild className="hover:bg-gray-100">
+                        <Link to="/seller/dashboard" className="w-full">
+                          Seller Dashboard
+                        </Link>
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}>
-                      Sign Out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            ) : (
-              <>
-                <Button variant="ghost" asChild>
-                  <Link to="/login">Sign In</Link>
-                </Button>
-                <Button asChild>
-                  <Link to="/signup">Sign Up</Link>
-                </Button>
-              </>
+                  </div>
+
+                  <DropdownMenuSeparator className="border-gray-200" />
+
+                  {/* Sign Out */}
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="text-white bg-orange-500 hover:bg-orange-600 rounded-md mx-2 my-1 text-center"
+                  >
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
-
-          {/* Mobile menu (authenticated and guest) */}
+          {/* Mobile menu */}
+          {/* Mobile menu (authenticated and guest) */}{" "}
           <div className="md:hidden">
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
-                  <Menu className="h-5 w-5" />
+                  <Menu className="h-5 w-5 text-gray-100" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-72 sm:w-80">
+              <SheetContent
+                side="right"
+                className="w-72 sm:w-80 bg-gray-900 text-gray-100"
+              >
                 <SheetHeader>
-                  <SheetTitle>Menu</SheetTitle>
+                  <SheetTitle className="text-white">Menu</SheetTitle>
                 </SheetHeader>
                 <div className="mt-4 grid gap-3">
-                  {isAuthenticated ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        className="justify-between"
-                        asChild
-                      >
-                        <Link to="/favourites">
-                          <span className="flex items-center">
-                            <Heart className="h-4 w-4 mr-2" /> Favourites
-                          </span>
-                          {favouritesCount > 0 && (
-                            <span className="inline-flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
-                              {favouritesCount}
-                            </span>
-                          )}
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" className="justify-start" asChild>
-                        <Link to="/messages">
-                          <MessageSquare className="h-4 w-4 mr-2" /> Messages
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleOpenNotifications}
-                        className="flex items-center justify-between w-full px-4"
-                      >
-                        {/* Bell icon on left */}
-                        <div className="flex items-center gap-2">
-                          <Bell className="h-5 w-5" />
-                          <span className="text-sm font-medium">Bell</span>
-                        </div>
-
-                        {/* Count badge on the right */}
-                        {unreadCount > 0 && (
-                          <span className="flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
-                            {unreadCount}
-                          </span>
-                        )}
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        className="justify-between"
-                        asChild
-                      >
-                        <Link to="/cart">
-                          <span className="flex items-center">
-                            <ShoppingCart className="h-4 w-4 mr-2" /> Cart
-                          </span>
-                          {cartCount > 0 && (
-                            <span className="inline-flex items-center justify-center rounded-full bg-primary text-white text-[10px] h-4 min-w-[16px] px-1">
-                              {cartCount}
-                            </span>
-                          )}
-                        </Link>
-                      </Button>
-                      {user?.role === "seller" && (
-                        <Button
-                          variant="ghost"
-                          className="justify-start"
-                          asChild
-                        >
-                          <Link to="/seller/dashboard">Seller Dashboard</Link>
-                        </Button>
+                  <div className="flex flex-col gap-1 w-full">
+                    {/* Favourites */}
+                    <Button
+                      variant="ghost"
+                      className="flex items-center justify-between px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
+                      onClick={() => {
+                        if (isAuthenticated) navigate("/favourites");
+                        else navigate("/login");
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Heart className="h-5 w-5 text-amber-400" />
+                        <span className="text-sm font-medium">Favourites</span>
+                      </div>
+                      {isAuthenticated && favouritesCount > 0 && (
+                        <span className="flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1">
+                          {favouritesCount}
+                        </span>
                       )}
-                      <div className="h-px bg-border my-1" />
-                      <Button variant="destructive" onClick={handleLogout}>
+                    </Button>
+                    {/* Messages */}
+                    <Button
+                      variant="ghost"
+                      className="flex items-center justify-start px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
+                      onClick={() => {
+                        if (isAuthenticated) navigate("/messages");
+                        else navigate("/login");
+                      }}
+                    >
+                      <MessageSquare className="h-5 w-5 text-amber-400 mr-2" />
+                      <span className="text-sm font-medium">Messages</span>
+                    </Button>
+                    {/* Notifications */}
+                    <Button
+                      variant="ghost"
+                      className="flex items-center justify-between px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
+                      onClick={() => {
+                        if (isAuthenticated) handleOpenNotifications();
+                        else navigate("/login");
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Bell className="h-5 w-5 text-amber-400" />
+                        <span className="text-sm font-medium">
+                          Notifications
+                        </span>
+                      </div>
+                      {isAuthenticated && unreadCount > 0 && (
+                        <span className="flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </Button>
+                    {/* Cart */}
+                    <Button
+                      variant="ghost"
+                      className="flex items-center justify-between px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
+                      onClick={() => {
+                        if (isAuthenticated) navigate("/cart");
+                        else navigate("/login");
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ShoppingCart className="h-5 w-5 text-amber-400" />
+                        <span className="text-sm font-medium">Cart</span>
+                      </div>
+                      {isAuthenticated && cartCount > 0 && (
+                        <span className="flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1">
+                          {cartCount}
+                        </span>
+                      )}
+                    </Button>
+                    {/* Seller Dashboard */}
+                    {isAuthenticated && user?.role === "seller" && (
+                      <Button
+                        variant="ghost"
+                        className="flex items-center justify-start px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
+                        asChild
+                      >
+                        <Link
+                          to="/seller/dashboard"
+                          className="flex items-center gap-2"
+                        >
+                          <User className="h-5 w-5 text-amber-400" />
+                          <span className="text-sm font-medium">
+                            Seller Dashboard
+                          </span>
+                        </Link>
+                      </Button>
+                    )}
+                    {/* Divider */}
+                    {isAuthenticated && (
+                      <div className="h-px bg-gray-700 my-2" />
+                    )}
+                    {/* Logout */}
+                    {isAuthenticated && (
+                      <Button
+                        variant="destructive"
+                        className="bg-red-600 hover:bg-red-700 text-white mt-1"
+                        onClick={handleLogout}
+                      >
                         Sign Out
                       </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="ghost" asChild>
-                        <Link to="/login">Sign In</Link>
-                      </Button>
-                      <Button asChild>
-                        <Link to="/signup">Sign Up</Link>
-                      </Button>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
           </div>
         </div>
       </div>
+
+      {/* Notifications Modal */}
       <Dialog open={openNotifications} onOpenChange={setOpenNotifications}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Notifications</DialogTitle>
+            <DialogTitle className="text-gray-900">Notifications</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2 max-h-96 overflow-y-auto">
             {notifications.filter((n) => !n.read).length === 0 ? (
-              <p className="text-center text-muted-foreground text-sm">
+              <p className="text-center text-gray-400 text-sm">
                 No unread notifications 🎉
               </p>
             ) : (
@@ -335,11 +417,13 @@ const Header = () => {
                 .map((n) => (
                   <div
                     key={n._id}
-                    className="rounded-lg border p-3 hover:bg-muted transition-colors"
+                    className="rounded-lg border p-3 hover:bg-gray-100 transition-colors"
                   >
-                    <p className="font-medium text-sm">{n.title}</p>
-                    <p className="text-xs text-muted-foreground">{n.message}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
+                    <p className="font-medium text-sm text-gray-900">
+                      {n.title}
+                    </p>
+                    <p className="text-xs text-gray-600">{n.message}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">
                       {new Date(n.createdAt).toLocaleString()}
                     </p>
                   </div>
@@ -348,6 +432,13 @@ const Header = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Categories Modal */}
+      <ShopByCategoryMenu
+        categories={categoriesData || []}
+        open={openCategories}
+        onClose={() => setOpenCategories(false)}
+      />
     </header>
   );
 };

@@ -254,6 +254,24 @@ export const fetchSellerProfileByUser = async (
   return data?.data?.profile || data?.profile || data;
 };
 
+export const fetchSellerProfile = async (
+  id: string
+): Promise<SellerProfile> => {
+  const response = await fetch(`${BASE_URL}/api/v1/sellers/${id}`, {
+    // headers: {
+    //   Authorization: `Bearer ${token}`,
+    // },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch seller profile");
+  }
+
+  const data = await response.json();
+  // console.log("API Response:", data);
+  return data?.data?.profile || data?.profile || data;
+};
+
 export const updateSellerProfile = async (
   sellerId: string,
   profileData: Partial<Omit<SellerProfile, "logo">> & { logo?: File },

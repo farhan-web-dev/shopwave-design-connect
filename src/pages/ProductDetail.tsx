@@ -65,6 +65,7 @@ const ProductDetail = () => {
     queryFn: () => fetchSellerById(product?.sellerId || ""),
     enabled: !!product?.sellerId,
   });
+  console.log(sellerInfo);
 
   const { data: categoryProducts, isLoading: isCategoryProductsLoading } =
     useQuery<Product[]>({
@@ -100,23 +101,29 @@ const ProductDetail = () => {
       .slice(0, 4); // Limit to 4 products
   }, [categoryProducts, id]);
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+
+    // 🟠 Case 1: User is NOT logged in — use localStorage
     if (!isAuthenticated) {
-      const next = encodeURIComponent(location.pathname + location.search);
-      navigate(
-        `/login?next=${next}&addProductId=${encodeURIComponent(id || "")}`
-      );
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+      const existingItem = cart.find((item: any) => item.productId === id);
+      if (existingItem) {
+        existingItem.quantity += 1;
+      } else {
+        cart.push({ productId: id, quantity: 1 });
+      }
+
+      localStorage.setItem("cart", JSON.stringify(cart));
+      toast.success("Added to cart");
       return;
     }
 
-    if (!id) {
-      toast.error("Product ID not found");
-      return;
-    }
-
+    // 🟢 Case 2: User is logged in — send to backend
     try {
-      await addCartItem(id, quantity, token || undefined);
-      toast.success("Added to cart!");
+      await addCartItem(id, 1, token);
+      toast.success("Added to cart");
       queryClient.invalidateQueries({ queryKey: ["cart"] });
     } catch (err) {
       toast.error("Failed to add to cart");
@@ -264,7 +271,14 @@ const ProductDetail = () => {
             <Separator />
 
             {/* ✅ Seller Info */}
-            <Card>
+            <Card
+              onClick={() => {
+                if (sellerInfo?._id) {
+                  navigate(`/seller/${sellerInfo?.userId?.id}`);
+                }
+              }}
+              className="cursor-pointer hover:shadow-md transition-shadow"
+            >
               <CardContent className="p-3 sm:p-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -284,7 +298,7 @@ const ProductDetail = () => {
                         {sellerInfo?.storeName || "Seller"}
                       </span>
                       <p className="text-xs sm:text-sm text-muted-foreground">
-                        Verified seller
+                        {sellerInfo?.verficationStatus}
                       </p>
                     </div>
                   </div>
@@ -292,7 +306,10 @@ const ProductDetail = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleMessageSeller}
+                    onClick={(e) => {
+                      e.stopPropagation(); // prevent navigation
+                      handleMessageSeller();
+                    }}
                     className="w-full sm:w-auto"
                   >
                     <MessageSquare className="h-4 w-4 mr-2" />

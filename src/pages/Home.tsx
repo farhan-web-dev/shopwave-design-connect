@@ -59,7 +59,11 @@ const Home = () => {
       <section className="container mx-auto px-4 py-12">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-bold">Featured Products</h2>
-          <Button variant="outline" asChild>
+          <Button
+            className="bg-white-500 hover:bg-orange-600 text-black px-6 py-2  rounded-md w-24 h-12 "
+            variant="outline"
+            asChild
+          >
             <Link to="/products">View All</Link>
           </Button>
         </div>
@@ -89,6 +93,7 @@ const Home = () => {
                   rating={ratingData?.rating ?? 0}
                   reviews={ratingData?.reviews ?? 0}
                   badge={product.badge}
+                  parentCategory={product.parentCategoryId}
                 />
               );
             })}

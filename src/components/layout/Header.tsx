@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,7 @@ import {
 } from "@radix-ui/react-dropdown-menu";
 
 const Header = () => {
+  const [guestCartCount, setGuestCartCount] = useState(0);
   const { isAuthenticated, user, token, logout } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -57,8 +58,22 @@ const Header = () => {
     enabled: !!token,
     staleTime: 5000,
   });
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+      const total = cart.reduce(
+        (sum: number, item: any) => sum + (item.quantity || 1),
+        0
+      );
+      setGuestCartCount(total);
+    }
+  }, [isAuthenticated]);
+
+  // 🟢 Decide which count to show
   const cartCount =
-    cartData?.items?.reduce((sum, it) => sum + it.quantity, 0) || 0;
+    isAuthenticated && cartData
+      ? cartData.items?.reduce((sum, it) => sum + it.quantity, 0) || 0
+      : guestCartCount;
 
   const { data: favourites } = useQuery<Favourite[]>({
     queryKey: ["favourites"],
@@ -66,6 +81,7 @@ const Header = () => {
     enabled: isAuthenticated && !!token,
     staleTime: 5000,
   });
+  // console.log("Favourites in Header:", favourites);
   const favouritesCount = favourites?.length || 0;
 
   // Notifications
@@ -148,14 +164,12 @@ const Header = () => {
               variant="ghost"
               size="icon"
               className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
-              onClick={() =>
-                isAuthenticated ? navigate("/favourites") : navigate("/login")
-              }
+              onClick={() => navigate("/favourites")}
             >
               <div className="relative">
                 <Heart className="h-5 w-5 text-gray-100" />
                 {isAuthenticated && favouritesCount > 0 && (
-                  <span className="absolute -top-1 -right-1 rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1 flex items-center justify-center">
+                  <span className="absolute -top-4 -right-3 rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1 flex items-center justify-center">
                     {favouritesCount}
                   </span>
                 )}
@@ -167,9 +181,7 @@ const Header = () => {
               variant="ghost"
               size="icon"
               className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
-              onClick={() =>
-                isAuthenticated ? navigate("/messages") : navigate("/login")
-              }
+              onClick={() => navigate("/messages")}
             >
               <MessageSquare className="h-5 w-5 text-gray-100" />
             </Button>
@@ -179,13 +191,11 @@ const Header = () => {
               variant="ghost"
               size="icon"
               className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
-              onClick={() =>
-                isAuthenticated ? handleOpenNotifications() : navigate("/login")
-              }
+              onClick={() => handleOpenNotifications()}
             >
               <div className="relative">
                 <Bell className="h-5 w-5 text-gray-100" />
-                {isAuthenticated && unreadCount > 0 && (
+                {unreadCount > 0 && (
                   <span className="absolute -top-4 -right-3 rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1 flex items-center justify-center">
                     {unreadCount}
                   </span>
@@ -198,20 +208,26 @@ const Header = () => {
               variant="ghost"
               size="icon"
               className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
-              onClick={() =>
-                isAuthenticated ? navigate("/cart") : navigate("/login")
-              }
+              onClick={() => navigate("/cart")}
             >
               <div className="relative">
                 <ShoppingCart className="h-5 w-5 text-gray-100" />
-                {isAuthenticated && cartCount > 0 && (
+                {cartCount > 0 && (
                   <span className="absolute -top-4 -right-3 rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1 flex items-center justify-center">
                     {cartCount}
                   </span>
                 )}
               </div>
             </Button>
-            {isAuthenticated && (
+            {/* <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
+            >
+              <User className="h-5 w-5" />
+            </Button> */}
+            {/* User Icon (always visible) */}
+            {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -227,7 +243,6 @@ const Header = () => {
                   align="end"
                   className="w-56 bg-white text-gray-700 shadow-lg rounded-md border border-gray-200"
                 >
-                  {/* User info */}
                   <div className="px-4 py-3 border-b border-gray-200">
                     <p className="text-sm font-medium">{user?.name}</p>
                     <p className="text-xs text-gray-500 truncate">
@@ -235,7 +250,6 @@ const Header = () => {
                     </p>
                   </div>
 
-                  {/* Menu items */}
                   <div className="py-1 flex flex-col px-4 gap-2">
                     <DropdownMenuItem asChild className="hover:bg-gray-100">
                       <Link to="/account" className="w-full">
@@ -260,7 +274,6 @@ const Header = () => {
 
                   <DropdownMenuSeparator className="border-gray-200" />
 
-                  {/* Sign Out */}
                   <DropdownMenuItem
                     onClick={handleLogout}
                     className="text-white bg-orange-500 hover:bg-orange-600 rounded-md mx-2 my-1 text-center"
@@ -269,6 +282,15 @@ const Header = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hover:bg-amber-500/20 hover:text-amber-400 transition-colors"
+                onClick={() => navigate("/login")}
+              >
+                <User className="h-5 w-5" />
+              </Button>
             )}
           </div>
           {/* Mobile menu */}
@@ -294,8 +316,7 @@ const Header = () => {
                       variant="ghost"
                       className="flex items-center justify-between px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
                       onClick={() => {
-                        if (isAuthenticated) navigate("/favourites");
-                        else navigate("/login");
+                        navigate("/favourites");
                       }}
                     >
                       <div className="flex items-center gap-2">
@@ -313,8 +334,7 @@ const Header = () => {
                       variant="ghost"
                       className="flex items-center justify-start px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
                       onClick={() => {
-                        if (isAuthenticated) navigate("/messages");
-                        else navigate("/login");
+                        navigate("/messages");
                       }}
                     >
                       <MessageSquare className="h-5 w-5 text-amber-400 mr-2" />
@@ -325,8 +345,7 @@ const Header = () => {
                       variant="ghost"
                       className="flex items-center justify-between px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
                       onClick={() => {
-                        if (isAuthenticated) handleOpenNotifications();
-                        else navigate("/login");
+                        handleOpenNotifications();
                       }}
                     >
                       <div className="flex items-center gap-2">
@@ -335,7 +354,7 @@ const Header = () => {
                           Notifications
                         </span>
                       </div>
-                      {isAuthenticated && unreadCount > 0 && (
+                      {unreadCount > 0 && (
                         <span className="flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1">
                           {unreadCount}
                         </span>
@@ -346,15 +365,14 @@ const Header = () => {
                       variant="ghost"
                       className="flex items-center justify-between px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
                       onClick={() => {
-                        if (isAuthenticated) navigate("/cart");
-                        else navigate("/login");
+                        navigate("/cart");
                       }}
                     >
                       <div className="flex items-center gap-2">
                         <ShoppingCart className="h-5 w-5 text-amber-400" />
                         <span className="text-sm font-medium">Cart</span>
                       </div>
-                      {isAuthenticated && cartCount > 0 && (
+                      {cartCount > 0 && (
                         <span className="flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] h-4 min-w-[16px] px-1">
                           {cartCount}
                         </span>

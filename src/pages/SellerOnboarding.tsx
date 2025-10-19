@@ -98,7 +98,7 @@ const SellerOnboarding = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="logo">Logo (optional)</Label>
+              <Label htmlFor="logo">Banner (optional)</Label>
               <Input
                 id="logo"
                 type="file"

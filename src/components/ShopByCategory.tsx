@@ -49,7 +49,7 @@ const ShopByCategoryMenu = ({ categories, open, onClose }: Props) => {
                   <div key={main._id} className="group">
                     {/* Main Category */}
                     <Link
-                      to={`/products?${main._id}`}
+                      to={`/products?category=${main._id}`}
                       className="block font-semibold text-gray-900 text-[15px] mb-2 group-hover:text-orange-600 transition-colors"
                     >
                       {main.name}
@@ -61,7 +61,7 @@ const ShopByCategoryMenu = ({ categories, open, onClose }: Props) => {
                         {subs.slice(0, 6).map((sub) => (
                           <li key={sub._id}>
                             <Link
-                              to={`/category/${sub._id}`}
+                              to={`/products?category=${sub._id}`}
                               className="block text-gray-600 text-[14px] hover:text-orange-600 transition-colors"
                             >
                               {sub.name}

@@ -27,6 +27,7 @@ import ProfileSettings from "./pages/seller/ProfileSettings";
 import BuyerMessages from "./pages/Messages";
 import Favourites from "./pages/Favourites";
 import Orders from "./pages/Orders";
+import Seller from "./pages/Seller";
 
 const queryClient = new QueryClient();
 
@@ -81,45 +82,39 @@ const App = () => (
             <Route
               path="/cart"
               element={
-                <ProtectedRoute>
-                  <div className="flex flex-col min-h-screen">
-                    <Header />
-                    <main className="flex-1">
-                      <Cart />
-                    </main>
-                    <Footer />
-                  </div>
-                </ProtectedRoute>
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-1">
+                    <Cart />
+                  </main>
+                  <Footer />
+                </div>
               }
             />
 
             <Route
               path="/checkout"
               element={
-                <ProtectedRoute>
-                  <div className="flex flex-col min-h-screen">
-                    <Header />
-                    <main className="flex-1">
-                      <Checkout />
-                    </main>
-                    <Footer />
-                  </div>
-                </ProtectedRoute>
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-1">
+                    <Checkout />
+                  </main>
+                  <Footer />
+                </div>
               }
             />
 
             <Route
               path="/checkout/success"
               element={
-                <ProtectedRoute>
-                  <div className="flex flex-col min-h-screen">
-                    <Header />
-                    <main className="flex-1">
-                      <CheckoutSuccess />
-                    </main>
-                    <Footer />
-                  </div>
-                </ProtectedRoute>
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-1">
+                    <CheckoutSuccess />
+                  </main>
+                  <Footer />
+                </div>
               }
             />
 
@@ -156,15 +151,26 @@ const App = () => (
             <Route
               path="/orders"
               element={
-                <ProtectedRoute>
-                  <div className="flex flex-col min-h-screen">
-                    <Header />
-                    <main className="flex-1">
-                      <Orders />
-                    </main>
-                    <Footer />
-                  </div>
-                </ProtectedRoute>
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-1">
+                    <Orders />
+                  </main>
+                  <Footer />
+                </div>
+              }
+            />
+
+            <Route
+              path="/seller/:sellerId"
+              element={
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-1">
+                    <Seller />
+                  </main>
+                  <Footer />
+                </div>
               }
             />
 

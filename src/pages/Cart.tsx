@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,23 +13,67 @@ import {
   type CartData,
 } from "@/lib/api/cart";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchProductById } from "@/lib/api/products"; // <-- add this API helper
 
 const Cart = () => {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 🟢 Case 1: Logged in → fetch from backend
   const { data, isLoading, isError } = useQuery<CartData>({
     queryKey: ["cart", { token: !!token }],
-    queryFn: () => fetchCart(token || undefined),
+    queryFn: () => fetchCart(token!),
     enabled: !!token,
     retry: false,
   });
 
-  const [cartItems, setCartItems] = useState(() => data?.items ?? []);
+  // 🟠 Case 2: Guest → load from localStorage
+  useEffect(() => {
+    const loadGuestCart = async () => {
+      if (token) return; // skip if logged in
 
-  // Keep local state in sync when data changes
-  if (data && cartItems.length !== data.items.length) {
-    setCartItems(data.items);
-  }
+      const localCart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+      if (localCart.length === 0) {
+        setCartItems([]);
+        setLoading(false);
+        return;
+      }
+
+      // fetch each product detail
+      try {
+        const products = await Promise.all(
+          localCart.map(async (item: any) => {
+            const product = await fetchProductById(item.productId);
+            return {
+              ...product,
+              productId: item.productId,
+              quantity: item.quantity,
+              price: product.price,
+              title: product.title,
+              image: product.image,
+            };
+          })
+        );
+        setCartItems(products);
+      } catch (error) {
+        console.error("Failed to fetch local cart products", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadGuestCart();
+  }, [token]);
+
+  // sync backend cart when data changes
+  useEffect(() => {
+    if (token && data?.items) {
+      setCartItems(data.items);
+    }
+  }, [data, token]);
 
   const updateMutation = useMutation({
     mutationFn: ({
@@ -38,15 +82,14 @@ const Cart = () => {
     }: {
       productId: string;
       quantity: number;
-    }) => updateCartItem(productId, quantity, token || undefined),
+    }) => updateCartItem(productId, quantity, token!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (productId: string) =>
-      removeCartItem(productId, token || undefined),
+    mutationFn: (productId: string) => removeCartItem(productId, token!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       toast.success("Item removed from cart");
@@ -57,19 +100,40 @@ const Cart = () => {
     const item = cartItems.find((i) => i.productId === productId);
     if (!item) return;
     const nextQty = Math.max(1, item.quantity + delta);
+
+    // frontend update
     setCartItems((items) =>
       items.map((i) =>
         i.productId === productId ? { ...i, quantity: nextQty } : i
       )
     );
-    updateMutation.mutate({ productId, quantity: nextQty });
+
+    if (token) {
+      updateMutation.mutate({ productId, quantity: nextQty });
+    } else {
+      // update localStorage for guests
+      const localCart = JSON.parse(localStorage.getItem("cart") || "[]");
+      const updated = localCart.map((i: any) =>
+        i.productId === productId ? { ...i, quantity: nextQty } : i
+      );
+      localStorage.setItem("cart", JSON.stringify(updated));
+    }
   };
 
   const removeItem = (productId: string) => {
     setCartItems((items) =>
       items.filter((item) => item.productId !== productId)
     );
-    deleteMutation.mutate(productId);
+
+    if (token) {
+      deleteMutation.mutate(productId);
+    } else {
+      // remove from localStorage
+      const localCart = JSON.parse(localStorage.getItem("cart") || "[]");
+      const updated = localCart.filter((i: any) => i.productId !== productId);
+      localStorage.setItem("cart", JSON.stringify(updated));
+      toast.success("Item removed from cart");
+    }
   };
 
   const subtotal = cartItems.reduce(
@@ -79,57 +143,38 @@ const Cart = () => {
   const shipping = subtotal > 100 ? 0 : 10;
   const total = subtotal + shipping;
 
-  if (!token) {
+  // handle loading / empty states
+  if ((token && isLoading) || (!token && loading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">
-            Please log in to view your cart
-          </h2>
-          <Button asChild>
-            <Link to="/login">Go to Login</Link>
-          </Button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+        Loading cart...
       </div>
     );
   }
 
-  if (isLoading) {
+  if (
+    (!token && cartItems.length === 0) ||
+    (token && data?.items.length === 0)
+  ) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center text-sm text-muted-foreground">
-          Loading cart...
-        </div>
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Unable to load cart</h2>
-          <p className="text-muted-foreground mb-6">Please try again later</p>
-          <Button asChild>
-            <Link to="/products">Continue Shopping</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (data && data.items.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen flex items-center justify-center text-center">
+        <div>
           <h2 className="text-2xl font-bold mb-4">Your cart is empty</h2>
-          <p className="text-muted-foreground mb-6">
-            Add some products to get started
-          </p>
           <Button asChild>
             <Link to="/products">Continue Shopping</Link>
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  if (token && isError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-center">
+        <h2 className="text-2xl font-bold mb-4">Unable to load cart</h2>
+        <Button asChild>
+          <Link to="/products">Continue Shopping</Link>
+        </Button>
       </div>
     );
   }
@@ -143,7 +188,7 @@ const Cart = () => {
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {cartItems.map((item) => (
-              <Card key={item.id}>
+              <Card key={item.productId}>
                 <CardContent className="p-4">
                   <div className="flex gap-4">
                     <img
@@ -207,7 +252,6 @@ const Cart = () => {
             <Card>
               <CardContent className="p-6">
                 <h2 className="text-xl font-bold mb-4">Order Summary</h2>
-
                 <div className="space-y-3 mb-4">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
@@ -229,12 +273,6 @@ const Cart = () => {
                 <Button className="w-full" size="lg" asChild>
                   <Link to="/checkout">Proceed to Checkout</Link>
                 </Button>
-
-                {shipping > 0 && (
-                  <p className="text-sm text-center text-muted-foreground mt-4">
-                    Add ${(100 - subtotal).toFixed(2)} more for free shipping
-                  </p>
-                )}
               </CardContent>
             </Card>
           </div>

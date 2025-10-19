@@ -78,6 +78,32 @@ export async function fetchMyProducts(token?: string): Promise<MyProduct[]> {
   return withValidId.map(mapProduct);
 }
 
+export async function fetchSellerProducts(
+  sellerId?: string
+): Promise<MyProduct[]> {
+  const url = `${BASE_URL}/api/v1/products/seller/${sellerId}`;
+  const response = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      // ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) throw new Error("Failed to fetch seller products");
+  const json = await response.json();
+  console.log("seller products", json);
+  const list: ProductApi[] =
+    json?.data?.products ?? json?.products ?? json?.data ?? [];
+  const withValidId = Array.isArray(list)
+    ? list.filter(
+        (p) =>
+          p &&
+          ((p.id !== undefined && p.id !== null) ||
+            (p._id !== undefined && p._id !== null))
+      )
+    : [];
+  return withValidId.map(mapProduct);
+}
+
 export async function fetchProducts(
   params: FetchProductsParams = {}
 ): Promise<ProductsListResponse> {

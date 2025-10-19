@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchCart, type CartData } from "@/lib/api/cart";
@@ -14,16 +14,88 @@ import { Label } from "@/components/ui/label";
 import { StripeProvider } from "@/components/payments/StripeProvider";
 import { PaymentForm } from "@/components/payments/PaymentForm";
 import { toast } from "sonner";
+import { fetchProductById } from "@/lib/api/products";
 
 const Checkout = () => {
-  const { token } = useAuth();
+  const { token, isAuthenticated } = useAuth();
+  const [loading, setLoading] = useState(true);
+
+  // --- 1️⃣ Fetch user cart if logged in
   const { data, isLoading } = useQuery<CartData>({
     queryKey: ["cart", { token: !!token }],
     queryFn: () => fetchCart(token || undefined),
     enabled: !!token,
     retry: false,
   });
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  // --- 2️⃣ Local cart (for guests)
+  const [guestCart, setGuestCart] = useState<
+    {
+      productId: string;
+      title: string;
+      price: number;
+      quantity: number;
+      image: string;
+    }[]
+  >([]);
 
+  // useEffect(() => {
+  //   const loadGuestCart = async () => {
+  //     if (token) return; // skip if logged in
+
+  //     const localCart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+  //     if (localCart.length === 0) {
+  //       setCartItems([]);
+  // >([]);
+
+  useEffect(() => {
+    const loadGuestCart = async () => {
+      if (token) return; // skip if logged in
+
+      const localCart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+      if (localCart.length === 0) {
+        setCartItems([]);
+        setLoading(false);
+        return;
+      }
+
+      // fetch each product detail
+      try {
+        const products = await Promise.all(
+          localCart.map(async (item: any) => {
+            const product = await fetchProductById(item.productId);
+            return {
+              ...product,
+              productId: item.productId,
+              quantity: item.quantity,
+              price: product.price,
+              title: product.title,
+              image: product.image,
+            };
+          })
+        );
+        setCartItems(products);
+      } catch (error) {
+        console.error("Failed to fetch local cart products", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadGuestCart();
+  }, [token]);
+
+  // Use either logged-in cart or guest cart
+  const items = token ? data?.items ?? [] : cartItems;
+
+  // --- Calculations ---
+  const subtotal = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
+  const shipping = subtotal > 100 ? 0 : items.length > 0 ? 10 : 0;
+  const total = subtotal + shipping;
+
+  // --- 4️⃣ Form state
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -50,11 +122,6 @@ const Checkout = () => {
     setForm((f) => ({ ...f, [name]: value }));
   };
 
-  const items = data?.items ?? [];
-  const subtotal = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
-  const shipping = subtotal > 100 ? 0 : items.length > 0 ? 10 : 0;
-  const total = subtotal + shipping;
-
   const isFormValid =
     form.fullName.trim() &&
     form.email.trim() &&
@@ -65,6 +132,7 @@ const Checkout = () => {
     form.postalCode.trim() &&
     form.country.trim();
 
+  // --- 5️⃣ Handle payment
   const handlePay = async () => {
     if (!isFormValid || items.length === 0) return;
 
@@ -93,7 +161,11 @@ const Checkout = () => {
         },
       };
 
-      const paymentIntent = await createPaymentIntent(paymentData, token);
+      // Only pass token if logged in
+      const paymentIntent = await createPaymentIntent(
+        paymentData,
+        token || undefined
+      );
 
       setPaymentState({
         clientSecret: paymentIntent.clientSecret,
@@ -111,7 +183,7 @@ const Checkout = () => {
 
   const handlePaymentSuccess = (orderId: string) => {
     toast.success("Payment completed successfully!");
-    // Redirect to success page or clear cart
+    localStorage.removeItem("cart"); // clear guest cart after success
     window.location.href = `/checkout/success?order=${orderId}`;
   };
 
@@ -124,106 +196,43 @@ const Checkout = () => {
     });
   };
 
+  // --- 6️⃣ Render
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
+          {/* Left Section - Form + Items */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Shipping Form */}
             <Card>
               <CardContent className="p-6">
                 <h2 className="text-xl font-bold mb-4">Shipping Information</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      name="fullName"
-                      value={form.fullName}
-                      onChange={onChange}
-                      placeholder="John Doe"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={form.email}
-                      onChange={onChange}
-                      placeholder="john@example.com"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      value={form.phone}
-                      onChange={onChange}
-                      placeholder="+1 555 000 1234"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      name="address"
-                      value={form.address}
-                      onChange={onChange}
-                      placeholder="123 Main St"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      name="city"
-                      value={form.city}
-                      onChange={onChange}
-                      placeholder="San Francisco"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="state">State/Province</Label>
-                    <Input
-                      id="state"
-                      name="state"
-                      value={form.state}
-                      onChange={onChange}
-                      placeholder="CA"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="postalCode">Postal Code</Label>
-                    <Input
-                      id="postalCode"
-                      name="postalCode"
-                      value={form.postalCode}
-                      onChange={onChange}
-                      placeholder="94103"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
-                      name="country"
-                      value={form.country}
-                      onChange={onChange}
-                      placeholder="United States"
-                    />
-                  </div>
+                  {Object.entries(form).map(([key, value]) => (
+                    <div key={key}>
+                      <Label htmlFor={key}>
+                        {key.replace(/([A-Z])/g, " $1")}
+                      </Label>
+                      <Input
+                        id={key}
+                        name={key}
+                        value={value}
+                        onChange={onChange}
+                        placeholder={key}
+                      />
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
+            {/* Order Items */}
             <Card>
               <CardContent className="p-6">
                 <h2 className="text-xl font-bold mb-4">Order Items</h2>
-                {isLoading ? (
+                {isLoading && isAuthenticated ? (
                   <div className="text-sm text-muted-foreground">
                     Loading cart...
                   </div>
@@ -234,7 +243,10 @@ const Checkout = () => {
                 ) : (
                   <div className="space-y-4">
                     {items.map((item) => (
-                      <div key={item.id} className="flex items-center gap-4">
+                      <div
+                        key={item.productId}
+                        className="flex items-center gap-4"
+                      >
                         <img
                           src={item.image}
                           alt={item.title}
@@ -257,6 +269,7 @@ const Checkout = () => {
             </Card>
           </div>
 
+          {/* Right Section - Summary */}
           <div>
             <Card>
               <CardContent className="p-6">
@@ -278,6 +291,7 @@ const Checkout = () => {
                     <span className="text-primary">${total.toFixed(2)}</span>
                   </div>
                 </div>
+
                 {paymentState.clientSecret ? (
                   <StripeProvider clientSecret={paymentState.clientSecret}>
                     <PaymentForm

@@ -51,11 +51,24 @@ const ProductCard = ({
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
+
+    // 🟠 Case 1: User is NOT logged in — use localStorage
     if (!isAuthenticated) {
-      const next = encodeURIComponent(location.pathname + location.search);
-      navigate(`/login?next=${next}&addProductId=${encodeURIComponent(id)}`);
+      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+      const existingItem = cart.find((item: any) => item.productId === id);
+      if (existingItem) {
+        existingItem.quantity += 1;
+      } else {
+        cart.push({ productId: id, quantity: 1 });
+      }
+
+      localStorage.setItem("cart", JSON.stringify(cart));
+      toast.success("Added to cart");
       return;
     }
+
+    // 🟢 Case 2: User is logged in — send to backend
     try {
       await addCartItem(id, 1, token || undefined);
       toast.success("Added to cart");
@@ -134,7 +147,7 @@ const ProductCard = ({
 
         <div className="p-4">
           <Link to={`/products/${id}`}>
-            <h3 className="font-medium text-sm mb-1 line-clamp-2 hover:text-orange-500 transition-colors">
+            <h3 className="font-medium text-md mb-1 line-clamp-2 hover:text-orange-500 transition-colors">
               {title}
             </h3>
           </Link>

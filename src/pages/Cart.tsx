@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -14,12 +14,25 @@ import {
 } from "@/lib/api/cart";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchProductById } from "@/lib/api/products"; // <-- add this API helper
+import GuestCheckoutModal from "@/components/payments/CheckoutMethod";
 
 const Cart = () => {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const navigate = useNavigate();
+
+  const handleCheckoutClick = () => {
+    if (token) {
+      // Logged in → go directly
+      navigate("/checkout");
+    } else {
+      // Guest → open modal
+      setShowModal(true);
+    }
+  };
 
   // 🟢 Case 1: Logged in → fetch from backend
   const { data, isLoading, isError } = useQuery<CartData>({
@@ -270,9 +283,26 @@ const Cart = () => {
                   </div>
                 </div>
 
-                <Button className="w-full" size="lg" asChild>
-                  <Link to="/checkout">Proceed to Checkout</Link>
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={handleCheckoutClick}
+                >
+                  Proceed to Checkout
                 </Button>
+
+                <GuestCheckoutModal
+                  open={showModal}
+                  onClose={() => setShowModal(false)}
+                  onGuestCheckout={() => {
+                    setShowModal(false);
+                    navigate("/checkout");
+                  }}
+                  onSignIn={() => {
+                    setShowModal(false);
+                    navigate("/login?next=/checkout");
+                  }}
+                />
               </CardContent>
             </Card>
           </div>

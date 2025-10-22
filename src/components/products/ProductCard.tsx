@@ -64,6 +64,8 @@ const ProductCard = ({
       }
 
       localStorage.setItem("cart", JSON.stringify(cart));
+      window.dispatchEvent(new Event("guestCartUpdated"));
+
       toast.success("Added to cart");
       return;
     }

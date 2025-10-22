@@ -22,6 +22,7 @@ import {
   Menu,
   Grid,
   ChevronDown,
+  Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,16 +59,31 @@ const Header = () => {
     enabled: !!token,
     staleTime: 5000,
   });
+
   useEffect(() => {
-    if (!isAuthenticated) {
+    const updateGuestCartCount = () => {
       const cart = JSON.parse(localStorage.getItem("cart") || "[]");
       const total = cart.reduce(
         (sum: number, item: any) => sum + (item.quantity || 1),
         0
       );
       setGuestCartCount(total);
-    }
-  }, [isAuthenticated]);
+    };
+
+    // Run once initially
+    updateGuestCartCount();
+
+    // Listen for changes (manual trigger)
+    window.addEventListener("guestCartUpdated", updateGuestCartCount);
+
+    // Optional: also listen for browser storage changes (multi-tab)
+    window.addEventListener("storage", updateGuestCartCount);
+
+    return () => {
+      window.removeEventListener("guestCartUpdated", updateGuestCartCount);
+      window.removeEventListener("storage", updateGuestCartCount);
+    };
+  }, []);
 
   // 🟢 Decide which count to show
   const cartCount =
@@ -251,11 +267,11 @@ const Header = () => {
                   </div>
 
                   <div className="py-1 flex flex-col px-4 gap-2">
-                    <DropdownMenuItem asChild className="hover:bg-gray-100">
+                    {/* <DropdownMenuItem asChild className="hover:bg-gray-100">
                       <Link to="/account" className="w-full">
                         My Account
                       </Link>
-                    </DropdownMenuItem>
+                    </DropdownMenuItem> */}
 
                     <DropdownMenuItem asChild className="hover:bg-gray-100">
                       <Link to="/orders" className="w-full">
@@ -393,6 +409,18 @@ const Header = () => {
                           <span className="text-sm font-medium">
                             Seller Dashboard
                           </span>
+                        </Link>
+                      </Button>
+                    )}
+                    {isAuthenticated && (
+                      <Button
+                        variant="ghost"
+                        className="flex items-center justify-start px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
+                        asChild
+                      >
+                        <Link to="/orders" className="flex items-center gap-2">
+                          <Package className="h-5 w-5 text-amber-400" />
+                          <span className="text-sm font-medium">My Orders</span>
                         </Link>
                       </Button>
                     )}

@@ -20,6 +20,7 @@ export interface PaymentIntentRequest {
     postalCode: string;
     country: string;
   };
+  isGuest?: boolean; // ✅ Added to distinguish guest vs signed-in user
 }
 
 export interface PaymentIntentResponse {
@@ -62,7 +63,7 @@ export interface OrderData {
 }
 
 /**
- * Create a payment intent for Stripe
+ * Create a payment intent (works for both guest and signed-in users)
  */
 export async function createPaymentIntent(
   paymentData: PaymentIntentRequest,
@@ -72,9 +73,12 @@ export async function createPaymentIntent(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
+      ...(token && { Authorization: `Bearer ${token}` }), // only if user is logged in
     },
-    body: JSON.stringify(paymentData),
+    body: JSON.stringify({
+      ...paymentData,
+      isGuest: !token, // ✅ mark if it’s a guest payment
+    }),
   });
 
   if (!response.ok) {
@@ -86,7 +90,7 @@ export async function createPaymentIntent(
 }
 
 /**
- * Confirm a payment intent
+ * Confirm a payment intent (guest or user)
  */
 export async function confirmPayment(
   paymentIntentId: string,
@@ -110,7 +114,7 @@ export async function confirmPayment(
 }
 
 /**
- * Get payment status
+ * Get payment status (guest or user)
  */
 export async function getPaymentStatus(
   paymentIntentId: string,
@@ -135,7 +139,7 @@ export async function getPaymentStatus(
 }
 
 /**
- * Get order details after successful payment
+ * Get order details (guest or user)
  */
 export async function getOrderDetails(
   orderId: string,
@@ -161,9 +165,14 @@ export async function getOrderDetails(
 }
 
 /**
- * Get user's order history
+ * Get user's order history (signed-in users only)
  */
 export async function getUserOrders(token?: string): Promise<OrderData[]> {
+  if (!token) {
+    // ✅ guest users have no order history endpoint
+    return [];
+  }
+
   const response = await fetch(`${BASE_URL}/api/v1/payments/orders`, {
     method: "GET",
     headers: {

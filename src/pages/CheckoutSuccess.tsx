@@ -15,7 +15,7 @@ const CheckoutSuccess = () => {
   const { data: order, isLoading } = useQuery({
     queryKey: ["order", orderId],
     queryFn: () => getOrderDetails(orderId!, token),
-    enabled: !!orderId && !!token,
+    enabled: !!orderId,
   });
 
   if (!orderId) {

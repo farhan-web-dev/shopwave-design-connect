@@ -14,7 +14,7 @@ const CategoryGrid = () => {
     queryFn: fetchCategories,
   });
 
-  console.log("Categories:", categories);
+  // console.log("Categories:", categories);
   // ✅ Only main categories
   const mainCategories = (categories ?? []).filter(
     (category) => category.parentCategoryId === null

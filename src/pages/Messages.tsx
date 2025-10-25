@@ -575,8 +575,9 @@ const Messages = () => {
                                   </p>
                                 </div>
                                 <div className="flex items-center justify-between mt-1">
-                                  <p className="text-sm text-gray-600 truncate">
-                                    {lastText}
+                                  <p className="text-sm text-gray-600 truncate flex-1 min-w-0">
+                                    {lastText.split("").slice(0, 30).join("")}
+                                    ...
                                   </p>
                                   {unreadCount > 0 && (
                                     <Badge className="bg-blue-600 text-white text-xs">
@@ -713,6 +714,7 @@ const Messages = () => {
                   />
                 </div>
               </CardHeader>
+
               <CardContent className="p-0">
                 <ScrollArea className="h-[450px]">
                   <div className="space-y-1">
@@ -735,6 +737,7 @@ const Messages = () => {
                         unreadByConversationId[senderId] ||
                         0;
                       const isActive = selectedSenderId === senderId;
+
                       return (
                         <div
                           key={item.conversationId || senderId}
@@ -755,19 +758,25 @@ const Messages = () => {
                                   .join("")}
                               </AvatarFallback>
                             </Avatar>
+
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm font-medium text-gray-900 truncate">
+                              {/* Top row: name + time */}
+                              <div className="flex items-center justify-between space-x-2">
+                                <p className="text-sm font-medium text-gray-900 truncate max-w-[70%]">
                                   {name}
                                 </p>
-                                <p className="text-xs text-gray-500">{time}</p>
+                                <p className="text-xs text-gray-500 flex-shrink-0">
+                                  {time}
+                                </p>
                               </div>
-                              <div className="flex items-center justify-between mt-1">
-                                <p className="text-sm text-gray-600 truncate">
-                                  {lastText}
+
+                              {/* Bottom row: last message + badge */}
+                              <div className="flex items-center justify-between mt-1 space-x-2">
+                                <p className="text-sm text-gray-600 truncate flex-1 min-w-0">
+                                  {lastText.split("").slice(0, 40).join("")}...
                                 </p>
                                 {unreadCount > 0 && (
-                                  <Badge className="bg-blue-600 text-white text-xs">
+                                  <Badge className="bg-blue-600 text-white text-xs flex-shrink-0">
                                     {unreadCount}
                                   </Badge>
                                 )}

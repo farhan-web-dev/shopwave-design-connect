@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,8 @@ type UnreadCountsResponse =
 const Messages = () => {
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const sellerIdFromUrl = searchParams.get("sellerId");
 
   const currentUserId = user?.id;
   const authHeader = useMemo(
@@ -70,6 +73,32 @@ const Messages = () => {
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedSenderId, setSelectedSenderId] = useState<string | null>(null);
+  const [hasSentInitialMessage, setHasSentInitialMessage] = useState(false);
+
+  // Fetch seller details when sellerId is provided
+  const { data: sellerData } = useQuery({
+    queryKey: ["seller", sellerIdFromUrl],
+    enabled: !!sellerIdFromUrl && !!token,
+    queryFn: async () => {
+      if (!sellerIdFromUrl) return null;
+      try {
+        const res = await fetch(`${BASE_URL}/api/v1/users/${sellerIdFromUrl}`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader,
+          },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          return json.data || json;
+        }
+        return null;
+      } catch (error) {
+        console.warn("Failed to fetch seller details:", error);
+        return null;
+      }
+    },
+  });
 
   // Conversations list
   const { data: conversationsData, isLoading: isConversationsLoading } =
@@ -84,7 +113,6 @@ const Messages = () => {
           },
         });
         const json = await res.json();
-        // console.log("conversations", json);
         return json.data || json;
       },
     });
@@ -104,7 +132,6 @@ const Messages = () => {
         }
       );
       const json = await res.json();
-      // console.log("unreadCounts", json);
       return (json.data || json) as UnreadCountsResponse;
     },
   });
@@ -140,8 +167,6 @@ const Messages = () => {
   // Sidebar users: show the other participant (not the current user)
   const sidebarSenders = useMemo(() => {
     const list = conversationsData?.conversations || [];
-    // console.log("sidebarSenders raw", list);
-    // Build entries with the "other participant" relative to the current user
     const entries = list
       .map((c) => {
         const participants = c.participants || [];
@@ -156,7 +181,6 @@ const Messages = () => {
         );
         return {
           conversationId: c._id,
-          // We will use `sender` to mean "the other user" in the sidebar context
           sender: otherParticipant as unknown as BackendParticipant,
           receiver: selfParticipant as unknown as BackendParticipant,
           lastMessage:
@@ -179,7 +203,6 @@ const Messages = () => {
       if (!existing) {
         bySenderId.set(sid, item);
       } else {
-        // Keep the most recently updated conversation if duplicates exist
         const a = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
         const b = existing.updatedAt
           ? new Date(existing.updatedAt).getTime()
@@ -194,18 +217,35 @@ const Messages = () => {
       return bt - at;
     });
 
-    // console.log("sidebarSenders processed", deduped);
-    return deduped;
-  }, [conversationsData, currentUserId]);
+    // If sellerId is provided in URL and not found in conversations, add a placeholder
+    if (
+      sellerIdFromUrl &&
+      !deduped.find(
+        (item) => (item.sender.id || item.sender._id) === sellerIdFromUrl
+      )
+    ) {
+      const sellerPlaceholder = {
+        conversationId: `placeholder-${sellerIdFromUrl}`,
+        sender: {
+          _id: sellerIdFromUrl,
+          id: sellerIdFromUrl,
+          name: sellerData?.name || sellerData?.username || "Seller",
+          email: sellerData?.email || "seller@example.com",
+        } as BackendParticipant,
+        receiver: {
+          _id: currentUserId || "",
+          id: currentUserId || "",
+          name: user?.name || "You",
+          email: user?.email || "",
+        } as BackendParticipant,
+        lastMessage: undefined,
+        updatedAt: new Date().toISOString(),
+      };
+      deduped.unshift(sellerPlaceholder);
+    }
 
-  // Selected sender
-  // useEffect(() => {
-  //   if (!selectedSenderId && sidebarSenders && sidebarSenders.length > 0) {
-  //     setSelectedSenderId(
-  //       sidebarSenders[0].sender.id || sidebarSenders[0].sender._id
-  //     );
-  //   }
-  // }, [sidebarSenders, selectedSenderId]);
+    return deduped;
+  }, [conversationsData, currentUserId, sellerIdFromUrl, user, sellerData]);
 
   // Currently selected conversation id (based on selected other participant)
   const selectedConversationId = useMemo(() => {
@@ -254,7 +294,6 @@ const Messages = () => {
               byIdJson.conversation?.messages ||
               [];
             if (Array.isArray(byIdMsgs) && byIdMsgs.length >= 0) {
-              // console.log("threadMessages by conversation id", byIdMsgs);
               return byIdMsgs as BackendMessage[];
             }
           }
@@ -281,13 +320,48 @@ const Messages = () => {
         );
         const json = await res.json();
         const msgs = (json.data && json.data.messages) || json.messages || [];
-        // console.log("threadMessages by pair", msgs);
         return msgs as BackendMessage[];
       }
 
       return [];
     },
   });
+
+  // Send message mutation
+  const sendMessageMutation = useMutation({
+    mutationFn: async (vars: { content: string; attachments: File[] }) => {
+      if (!selectedSenderId || !currentUserId) return;
+      const form = new FormData();
+      form.append("receiverId", selectedSenderId);
+      form.append("content", vars.content);
+      (vars.attachments || []).forEach((file) => {
+        form.append("attachments", file);
+      });
+
+      await fetch(`${BASE_URL}/api/v1/conversations`, {
+        method: "POST",
+        headers: {
+          ...authHeader,
+        },
+        body: form,
+      });
+    },
+    onSuccess: () => {
+      setMessageText("");
+      setPendingAttachments([]);
+      refetchMessages();
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+
+  // Send message function
+  const handleSendMessage = useCallback(() => {
+    if (!messageText.trim() && pendingAttachments.length === 0) return;
+    sendMessageMutation.mutate({
+      content: messageText.trim(),
+      attachments: pendingAttachments,
+    });
+  }, [messageText, pendingAttachments, sendMessageMutation]);
 
   // Mark selected conversation as read
   const markAsReadMutation = useMutation({
@@ -313,50 +387,64 @@ const Messages = () => {
     },
   });
 
+  // Selected sender
+  useEffect(() => {
+    if (!selectedSenderId && sidebarSenders && sidebarSenders.length > 0) {
+      // If sellerId is provided in URL, try to find that seller first
+      if (sellerIdFromUrl) {
+        const sellerConversation = sidebarSenders.find(
+          (sender) =>
+            (sender.sender.id || sender.sender._id) === sellerIdFromUrl
+        );
+        if (sellerConversation) {
+          setSelectedSenderId(
+            sellerConversation.sender.id || sellerConversation.sender._id
+          );
+          return;
+        }
+      }
+      // // Fallback to first conversation
+      // setSelectedSenderId(
+      //   sidebarSenders[0].sender.id || sidebarSenders[0].sender._id
+      // );
+    }
+  }, [sidebarSenders, selectedSenderId, sellerIdFromUrl]);
+
+  // Send initial message when starting a new conversation with seller from URL
+  useEffect(() => {
+    if (
+      sellerIdFromUrl &&
+      selectedSenderId === sellerIdFromUrl &&
+      !hasSentInitialMessage &&
+      (!threadMessages || threadMessages.length === 0)
+    ) {
+      const initialMessage =
+        "Hi! I'm interested in your product. Can you tell me more about it?";
+      setMessageText(initialMessage);
+      setHasSentInitialMessage(true);
+
+      // Auto-send the initial message after a short delay
+      setTimeout(() => {
+        if (messageText === initialMessage) {
+          handleSendMessage();
+        }
+      }, 1000);
+    }
+  }, [
+    sellerIdFromUrl,
+    selectedSenderId,
+    hasSentInitialMessage,
+    threadMessages,
+    messageText,
+    handleSendMessage,
+  ]);
+
   useEffect(() => {
     if (selectedConversationId) {
       markAsReadMutation.mutate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversationId]);
-
-  // Send message
-  const sendMessageMutation = useMutation({
-    mutationFn: async (vars: { content: string; attachments: File[] }) => {
-      if (!selectedSenderId || !currentUserId) return;
-      const form = new FormData();
-      // backend infers sender from token; provide receiverId and content
-      form.append("receiverId", selectedSenderId);
-      form.append("content", vars.content);
-      // append attachments; multiple entries with same key are supported by FormData
-      (vars.attachments || []).forEach((file) => {
-        form.append("attachments", file);
-      });
-
-      await fetch(`${BASE_URL}/api/v1/conversations`, {
-        method: "POST",
-        headers: {
-          // do not set Content-Type when sending FormData; browser will set boundary
-          ...authHeader,
-        },
-        body: form,
-      });
-    },
-    onSuccess: () => {
-      setMessageText("");
-      setPendingAttachments([]);
-      refetchMessages();
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-    },
-  });
-
-  const handleSendMessage = () => {
-    if (!messageText.trim() && pendingAttachments.length === 0) return;
-    sendMessageMutation.mutate({
-      content: messageText.trim(),
-      attachments: pendingAttachments,
-    });
-  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -374,7 +462,6 @@ const Messages = () => {
     if (files.length > 0) {
       setPendingAttachments((prev) => [...prev, ...files]);
     }
-    // reset the input so selecting the same file again triggers change
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -417,262 +504,409 @@ const Messages = () => {
   }, [threadMessages, currentUserId]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Messages</h1>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Messages</h1>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-        {/* ✅ Conversations List (Sidebar) */}
-        {!selectedSenderId && (
-          <Card className="lg:col-span-1 block lg:block">
-            <CardHeader>
-              <CardTitle>Conversations</CardTitle>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search conversations..."
-                  className="pl-10"
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[450px]">
-                <div className="space-y-1">
-                  {(sidebarSenders || []).map((item) => {
-                    const senderId = item.sender.id || item.sender._id;
-                    const name = item.sender.name || "Unknown";
-                    const lastText = item.lastMessage?.content || "";
-                    const time = item.updatedAt
-                      ? new Date(item.updatedAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "";
-                    const unreadCount =
-                      unreadByConversationId[item.conversationId] ||
-                      unreadByConversationId[senderId] ||
-                      0;
-                    const isActive = selectedSenderId === senderId;
-                    return (
-                      <div
-                        key={item.conversationId || senderId}
-                        className={`p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
-                          isActive ? "bg-gray-100" : ""
-                        }`}
-                        onClick={() => setSelectedSenderId(senderId)}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={undefined as unknown as string} />
-                            <AvatarFallback>
-                              {name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-gray-900 truncate">
-                                {name}
-                              </p>
-                              <p className="text-xs text-gray-500">{time}</p>
+          {/* ✅ Mobile View: show conversations or chat conditionally */}
+          <div className="lg:hidden">
+            {!selectedSender ? (
+              // 📱 Show conversation list on mobile
+              <Card>
+                <CardHeader>
+                  <CardTitle>Conversations</CardTitle>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search conversations..."
+                      className="pl-10"
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[500px]">
+                    <div className="space-y-1">
+                      {(sidebarSenders || []).map((item) => {
+                        const senderId = item.sender.id || item.sender._id;
+                        const name = item.conversationId?.startsWith(
+                          "placeholder-"
+                        )
+                          ? item.receiver.name || "Unknown"
+                          : item.sender.name || "Unknown";
+                        const lastText = item.lastMessage?.content || "";
+                        const time = item.updatedAt
+                          ? new Date(item.updatedAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "";
+                        const unreadCount =
+                          unreadByConversationId[item.conversationId] ||
+                          unreadByConversationId[senderId] ||
+                          0;
+                        return (
+                          <div
+                            key={item.conversationId || senderId}
+                            className="p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100"
+                            onClick={() => setSelectedSenderId(senderId)}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage
+                                  src={undefined as unknown as string}
+                                />
+                                <AvatarFallback>
+                                  {name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-medium text-gray-900 truncate">
+                                    {name}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {time}
+                                  </p>
+                                </div>
+                                <div className="flex items-center justify-between mt-1">
+                                  <p className="text-sm text-gray-600 truncate flex-1 min-w-0">
+                                    {lastText.split("").slice(0, 30).join("")}
+                                    ...
+                                  </p>
+                                  {unreadCount > 0 && (
+                                    <Badge className="bg-blue-600 text-white text-xs">
+                                      {unreadCount}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center justify-between mt-1">
-                              <p className="text-sm text-gray-600 truncate">
-                                {lastText}
-                              </p>
-                              {unreadCount > 0 && (
-                                <Badge className="bg-blue-600 text-white text-xs">
-                                  {unreadCount}
-                                </Badge>
-                              )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            ) : (
+              // 📱 Show chat view
+              <Card className="flex flex-col">
+                <CardHeader className="border-b border-gray-200 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSelectedSenderId(null)}
+                      className="mr-2"
+                    >
+                      ←
+                    </Button>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={undefined as unknown as string} />
+                      <AvatarFallback>
+                        {(selectedSender.conversationId?.startsWith(
+                          "placeholder-"
+                        )
+                          ? selectedSender.receiver.name
+                          : selectedSender.sender.name
+                        )
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-medium text-sm">
+                        {selectedSender.conversationId?.startsWith(
+                          "placeholder-"
+                        )
+                          ? selectedSender.receiver.name
+                          : selectedSender.sender.name}
+                      </h3>
+                      <p className="text-xs text-green-600">Online</p>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="flex-1 p-0">
+                  <ScrollArea className="h-[400px] p-4">
+                    <div className="space-y-4">
+                      {displayMessages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex ${
+                            message.isFromUser ? "justify-end" : "justify-start"
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[80%] px-3 py-2 rounded-lg ${
+                              message.isFromUser
+                                ? "bg-blue-100 text-gray-900"
+                                : "bg-gray-100 text-gray-900"
+                            }`}
+                          >
+                            <p className="text-sm">{message.text}</p>
+                            <p className="text-[10px] text-gray-500 mt-1">
+                              {message.timestamp}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+
+                <div className="border-t border-gray-200 p-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFilesSelected}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handlePickFiles}
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      placeholder="Type your message..."
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      className="flex-1 text-sm"
+                    />
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={
+                        !messageText.trim() && pendingAttachments.length === 0
+                      }
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+
+          {/* ✅ Desktop View */}
+          <div className="hidden lg:grid lg:grid-cols-3 gap-6 h-[600px]">
+            {/* Sidebar */}
+            <Card className="col-span-1">
+              <CardHeader>
+                <CardTitle>Conversations</CardTitle>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search conversations..."
+                    className="pl-10"
+                  />
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-0">
+                <ScrollArea className="h-[450px]">
+                  <div className="space-y-1">
+                    {(sidebarSenders || []).map((item) => {
+                      const senderId = item.sender.id || item.sender._id;
+                      const name = item.conversationId?.startsWith(
+                        "placeholder-"
+                      )
+                        ? item.receiver.name || "Unknown"
+                        : item.sender.name || "Unknown";
+                      const lastText = item.lastMessage?.content || "";
+                      const time = item.updatedAt
+                        ? new Date(item.updatedAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "";
+                      const unreadCount =
+                        unreadByConversationId[item.conversationId] ||
+                        unreadByConversationId[senderId] ||
+                        0;
+                      const isActive = selectedSenderId === senderId;
+
+                      return (
+                        <div
+                          key={item.conversationId || senderId}
+                          className={`p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
+                            isActive ? "bg-gray-100" : ""
+                          }`}
+                          onClick={() => setSelectedSenderId(senderId)}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage
+                                src={undefined as unknown as string}
+                              />
+                              <AvatarFallback>
+                                {name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+
+                            <div className="flex-1 min-w-0">
+                              {/* Top row: name + time */}
+                              <div className="flex items-center justify-between space-x-2">
+                                <p className="text-sm font-medium text-gray-900 truncate max-w-[70%]">
+                                  {name}
+                                </p>
+                                <p className="text-xs text-gray-500 flex-shrink-0">
+                                  {time}
+                                </p>
+                              </div>
+
+                              {/* Bottom row: last message + badge */}
+                              <div className="flex items-center justify-between mt-1 space-x-2">
+                                <p className="text-sm text-gray-600 truncate flex-1 min-w-0">
+                                  {lastText.split("").slice(0, 20).join("")}...
+                                </p>
+                                {unreadCount > 0 && (
+                                  <Badge className="bg-blue-600 text-white text-xs flex-shrink-0">
+                                    {unreadCount}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            {/* Chat */}
+            <Card className="col-span-2 flex flex-col">
+              {selectedSender ? (
+                <>
+                  <CardHeader className="border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={undefined as unknown as string} />
+                          <AvatarFallback>
+                            {(selectedSender.conversationId?.startsWith(
+                              "placeholder-"
+                            )
+                              ? selectedSender.receiver.name
+                              : selectedSender.sender.name
+                            )
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-medium">
+                            {selectedSender.conversationId?.startsWith(
+                              "placeholder-"
+                            )
+                              ? selectedSender.receiver.name
+                              : selectedSender.sender.name}
+                          </h3>
+                          <p className="text-sm text-green-600">Online</p>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ✅ Chat Interface */}
-        {(selectedSenderId || selectedSender) && (
-          <Card className="lg:col-span-2 flex flex-col block">
-            {/* Header */}
-            <CardHeader className="border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                {/* 🔙 Back button for mobile */}
-                <button
-                  className="lg:hidden text-gray-600 hover:text-gray-900"
-                  onClick={() => setSelectedSenderId(null)}
-                >
-                  ←
-                </button>
-
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={undefined as unknown as string} />
-                  <AvatarFallback>
-                    {selectedSender?.sender?.name
-                      ?.split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-medium">
-                    {selectedSender?.sender?.name || "User"}
-                  </h3>
-                  <p className="text-sm text-green-600">Online</p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Button variant="ghost" size="icon">
-                  <Phone className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon">
-                  <Info className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-
-            {/* Messages */}
-            <CardContent className="flex-1 p-0">
-              <ScrollArea className="h-[400px] p-4">
-                <div className="space-y-4">
-                  {displayMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${
-                        message.isFromUser ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          message.isFromUser
-                            ? "bg-amber-100 text-gray-900"
-                            : "bg-gray-100 text-gray-900"
-                        }`}
-                      >
-                        {Array.isArray(message.attachments) &&
-                          message.attachments.length > 0 && (
-                            <div className="mb-2 space-y-2">
-                              {message.attachments.map((att, idx) => {
-                                const attObj =
-                                  typeof att === "string" ? { url: att } : att;
-                                const url = attObj.url as string | undefined;
-                                const name =
-                                  (attObj.name as string) ||
-                                  url ||
-                                  "Attachment";
-                                const isImage = url
-                                  ? /(png|jpg|jpeg|gif|webp)$/i.test(url)
-                                  : false;
-                                return (
-                                  <div
-                                    key={idx}
-                                    className="border rounded bg-white p-2"
-                                  >
-                                    {url && isImage ? (
-                                      <img
-                                        src={url}
-                                        alt={name}
-                                        className="max-h-40 rounded object-cover"
-                                      />
-                                    ) : (
-                                      <div className="flex items-center gap-2 text-sm">
-                                        <Paperclip className="h-4 w-4" />
-                                        <a
-                                          href={url || "#"}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="underline"
-                                        >
-                                          {name}
-                                        </a>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        <p className="text-sm">{message.text}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {message.timestamp}
-                        </p>
+                      <div className="flex items-center space-x-2">
+                        <Button variant="ghost" size="icon">
+                          <Phone className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon">
+                          <Info className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
+                  </CardHeader>
 
-            {/* Input */}
-            <div className="border-t border-gray-200 p-4">
-              <div className="flex items-center space-x-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  onChange={handleFilesSelected}
-                  className="hidden"
-                />
-                <Button variant="ghost" size="icon" onClick={handlePickFiles}>
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-                <Input
-                  placeholder="Type your message here..."
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={
-                    !messageText.trim() && pendingAttachments.length === 0
-                  }
-                  className="bg-amber-700 hover:bg-amber-800 text-white"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+                  <CardContent className="flex-1 p-0">
+                    <ScrollArea className="h-[400px] p-4">
+                      <div className="space-y-4">
+                        {displayMessages.map((message) => (
+                          <div
+                            key={message.id}
+                            className={`flex ${
+                              message.isFromUser
+                                ? "justify-end"
+                                : "justify-start"
+                            }`}
+                          >
+                            <div
+                              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                message.isFromUser
+                                  ? "bg-blue-100 text-gray-900"
+                                  : "bg-gray-100 text-gray-900"
+                              }`}
+                            >
+                              <p className="text-sm">{message.text}</p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {message.timestamp}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
 
-              {pendingAttachments.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {pendingAttachments.map((file, idx) => (
-                    <div
-                      key={`${file.name}-${idx}`}
-                      className="flex items-center gap-2 px-2 py-1 rounded border text-xs bg-white"
-                    >
-                      <Paperclip className="h-3 w-3" />
-                      <span
-                        className="truncate max-w-[200px]"
-                        title={file.name}
-                      >
-                        {file.name}
-                      </span>
+                  <div className="border-t border-gray-200 p-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        onChange={handleFilesSelected}
+                        className="hidden"
+                      />
                       <Button
                         variant="ghost"
-                        size="sm"
-                        className="h-6 px-2"
-                        onClick={() => handleRemoveAttachment(idx)}
+                        size="icon"
+                        onClick={handlePickFiles}
                       >
-                        ✕
+                        <Paperclip className="h-4 w-4" />
+                      </Button>
+                      <Input
+                        placeholder="Type your message here..."
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={handleSendMessage}
+                        disabled={
+                          !messageText.trim() && pendingAttachments.length === 0
+                        }
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Send className="h-4 w-4" />
                       </Button>
                     </div>
-                  ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  Select a conversation to start chatting
                 </div>
               )}
-            </div>
-          </Card>
-        )}
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

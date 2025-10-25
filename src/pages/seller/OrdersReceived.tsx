@@ -205,19 +205,19 @@ const OrdersReceived = () => {
                           <TableCell>
                             <div className="text-sm">
                               <div className="font-medium">
-                                {order.buyerId.name}
+                                {order?.buyerId?.name}
                               </div>
                               <div className="text-xs text-gray-500">
-                                {order.buyerId.email}
+                                {order?.buyerId?.email}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell className="text-sm font-semibold">
-                            ${(order.total || 0).toFixed(2)}
+                            ${(order?.total || 0).toFixed(2)}
                           </TableCell>
                           <TableCell>
                             <Select
-                              value={order.orderStatus}
+                              value={order?.orderStatus}
                               onValueChange={(value) =>
                                 handleStatusUpdate(order._id, value)
                               }
@@ -309,11 +309,11 @@ const OrdersReceived = () => {
                   ${(order.total || 0).toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-600 mb-2">
-                  {order.buyerId.name} •{" "}
-                  {new Date(order.createdAt).toLocaleDateString()}
+                  {order?.buyerId?.name} •{" "}
+                  {new Date(order?.createdAt).toLocaleDateString()}
                 </div>
                 <div className="space-y-1 text-xs text-gray-700 mb-3">
-                  {order.items.slice(0, 2).map((item) => (
+                  {order?.items?.slice(0, 2).map((item) => (
                     <div key={item._id}>
                       {item.title} (x{item.quantity})
                     </div>

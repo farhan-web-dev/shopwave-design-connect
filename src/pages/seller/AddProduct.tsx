@@ -22,6 +22,7 @@ import { createProduct, type CreateProductData } from "@/lib/api/products";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchCategories, type Category } from "@/lib/api/categories";
 import { useToast } from "@/hooks/use-toast";
+import { BASE_URL } from "@/lib/url";
 
 const addProductSchema = z.object({
   title: z.string().min(1, "Product title is required"),
@@ -36,6 +37,9 @@ const addProductSchema = z.object({
   condition: z.enum(["new", "used"]).optional(),
   isAuction: z.boolean().optional(),
   auctionEndDate: z.string().optional(),
+  duration: z.string().optional(),
+  previewVideo: z.string().optional(),
+  videos: z.array(z.any()).optional(),
 });
 
 type AddProductForm = z.infer<typeof addProductSchema>;
@@ -46,6 +50,80 @@ const AddProduct = () => {
   const { toast } = useToast();
   // const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [uploadingPreview, setUploadingPreview] = useState(false);
+  const [uploadingVideos, setUploadingVideos] = useState(false);
+  const [previewVideoUrl, setPreviewVideoUrl] = useState("");
+  const [uploadedVideos, setUploadedVideos] = useState<any[]>([]);
+
+  const handleMuxUpload = async (file: File, type: "preview" | "video") => {
+    if (!file) return;
+    try {
+      type === "preview" ? setUploadingPreview(true) : setUploadingVideos(true);
+
+      // Step 1: Create upload
+      const res = await fetch(`${BASE_URL}/api/v1/mux/create-upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      // Step 2: Upload directly to Mux
+      await fetch(data.uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      // Step 3: Wait a bit for Mux to process (2-3 seconds)
+      await new Promise((r) => setTimeout(r, 3000));
+
+      // Step 4: Get the playback ID
+      const playbackRes = await fetch(
+        `${BASE_URL}/api/v1/mux/get-playback/${data.uploadId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const playbackData = await playbackRes.json();
+
+      if (!playbackData.playbackId) throw new Error("Playback not ready");
+
+      if (type === "preview") {
+        setPreviewVideoUrl(playbackData.playbackId);
+      } else {
+        setUploadedVideos((prev) => [
+          ...prev,
+          {
+            title: file.name,
+            url: playbackData.playbackId,
+          },
+        ]);
+      }
+
+      toast({
+        title: "Upload complete",
+        description: "Video is ready to play",
+      });
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: "Failed to upload video",
+        variant: "destructive",
+      });
+    } finally {
+      type === "preview"
+        ? setUploadingPreview(false)
+        : setUploadingVideos(false);
+    }
+  };
+
+  const handleMuxMultipleUpload = async (files: FileList | null) => {
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      await handleMuxUpload(file, "video");
+    }
+  };
 
   const {
     register,
@@ -66,8 +144,12 @@ const AddProduct = () => {
       condition: "new",
       isAuction: false,
       auctionEndDate: "",
+      duration: "",
+      previewVideo: "",
+      videos: [],
     },
   });
+  console.log(errors);
 
   // Fetch categories
   const {
@@ -101,6 +183,14 @@ const AddProduct = () => {
         ]
       : categories;
 
+  const selectedCategoryId = watch("categoryId");
+  const selectedCategory = displayCategories.find(
+    (c) => String(c.id) === selectedCategoryId
+  );
+  const isCourseCategory = selectedCategory?.name
+    ?.toLowerCase()
+    .includes("course");
+
   // Create product mutation
   const createProductMutation = useMutation({
     mutationFn: (data: CreateProductData) =>
@@ -122,54 +212,41 @@ const AddProduct = () => {
   });
 
   const onSubmit = async (data: AddProductForm) => {
-    if (!user?.id) {
-      toast({
-        title: "Error",
-        description: "User not authenticated",
-        variant: "destructive",
-      });
-      return;
-    }
+    console.log("submit");
+    if (!user?.id) return;
 
-    // Validate required fields
-    if (
-      !data.title ||
-      !data.description ||
-      !data.categoryId ||
-      data.price <= 0
-    ) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (imageFiles.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please upload at least one image",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const productData: CreateProductData = {
+    const baseProduct = {
       sellerId: user.id,
       title: data.title,
       description: data.description,
-      categoryId: data.categoryId, // Backend expects categoryId (the actual ID)
+      categoryId: data.categoryId,
       price: data.price,
-      stock: data.stock,
+      type: isCourseCategory ? "course" : "physical",
       images: imageFiles,
-      freeShipping: data.freeShipping,
-      condition: data.condition,
-      isAuction: data.isAuction,
-      auctionEndDate: data.auctionEndDate,
     };
 
-    // console.log("Submitting product data:", productData);
+    let productData;
+
+    if (isCourseCategory) {
+      productData = {
+        ...baseProduct,
+        courseThumbnail: imageFiles?.[0], // like normal image upload
+        duration: data.duration,
+        type: "course",
+        previewVideo: previewVideoUrl,
+        videos: uploadedVideos,
+      };
+    } else {
+      productData = {
+        ...baseProduct,
+        stock: data.stock,
+        freeShipping: data.freeShipping,
+        condition: data.condition,
+        isAuction: data.isAuction,
+        auctionEndDate: data.auctionEndDate,
+      };
+    }
+    console.log("p", productData);
     createProductMutation.mutate(productData);
   };
 
@@ -239,52 +316,6 @@ const AddProduct = () => {
               )}
             </div>
 
-            {/* Price & Stock */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price">Price</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                    $
-                  </span>
-                  <Input
-                    id="price"
-                    {...register("price", { valueAsNumber: true })}
-                    placeholder="0.00"
-                    type="number"
-                    step="0.01"
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="stock">Stock Quantity</Label>
-                <Input
-                  id="stock"
-                  {...register("stock", { valueAsNumber: true })}
-                  placeholder="0"
-                  type="number"
-                />
-              </div>
-            </div>
-
-            {/* Images */}
-            <div className="space-y-2">
-              <Label>Product Images</Label>
-              <ImageUpload
-                maxImages={5}
-                onImagesChange={(files) => {
-                  setImageFiles(files);
-                  setValue("images", files, { shouldValidate: true }); // ✅ triggers Zod validation
-                }}
-              />
-
-              {errors.images && (
-                <p className="text-sm text-red-600">{errors.images.message}</p>
-              )}
-            </div>
-
             {/* Description */}
             <div className="space-y-2">
               <Label htmlFor="description">Product Description</Label>
@@ -300,63 +331,178 @@ const AddProduct = () => {
                 </p>
               )}
             </div>
-
-            {/* Options */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="condition">Condition</Label>
-                <Select
-                  onValueChange={(value) =>
-                    setValue("condition", value as "new" | "used")
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select condition" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">New</SelectItem>
-                    <SelectItem value="used">Used</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center space-x-2 mt-4 sm:mt-8">
-                <Checkbox
-                  id="freeShipping"
-                  checked={watch("freeShipping")}
-                  onCheckedChange={(checked) =>
-                    setValue("freeShipping", !!checked)
-                  }
+            <div className="space-y-2">
+              <Label htmlFor="price">Price</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                  $
+                </span>
+                <Input
+                  id="price"
+                  {...register("price", { valueAsNumber: true })}
+                  placeholder="0.00"
+                  type="number"
+                  step="0.01"
+                  className="pl-8"
                 />
-                <Label htmlFor="freeShipping">Free Shipping</Label>
               </div>
             </div>
 
-            {/* Auction */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="isAuction"
-                  checked={watch("isAuction")}
-                  onCheckedChange={(checked) => {
-                    setValue("isAuction", !!checked);
-                    if (!checked) setValue("auctionEndDate", "");
-                  }}
-                />
-                <Label htmlFor="isAuction">This is an auction product</Label>
-              </div>
-
-              {watch("isAuction") && (
+            {/* Product Type Conditional Fields */}
+            {isCourseCategory ? (
+              <>
+                {/* 🔹 Thumbnail (ImageUpload like before) */}
                 <div className="space-y-2">
-                  <Label htmlFor="auctionEndDate">Auction End Date</Label>
-                  <Input
-                    id="auctionEndDate"
-                    {...register("auctionEndDate")}
-                    type="datetime-local"
+                  <Label>Course Thumbnail</Label>
+                  <ImageUpload
+                    maxImages={1}
+                    onImagesChange={(files) => {
+                      setImageFiles(files);
+                      setValue("images", files, { shouldValidate: true });
+                    }}
                   />
                 </div>
-              )}
-            </div>
+
+                {/* 🔹 Course Duration */}
+                <div className="space-y-2">
+                  <Label htmlFor="duration">Course Duration</Label>
+                  <Input
+                    id="duration"
+                    placeholder="e.g. 5 hours"
+                    {...register("duration")}
+                  />
+                </div>
+
+                {/* 🔹 Preview Video Upload (to Mux) */}
+                <div className="space-y-2">
+                  <Label htmlFor="previewVideo">Preview Video</Label>
+                  <Input
+                    id="previewVideo"
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) =>
+                      handleMuxUpload(e.target.files?.[0], "preview")
+                    }
+                  />
+                  {uploadingPreview && (
+                    <p className="text-sm text-muted-foreground">
+                      Uploading preview video...
+                    </p>
+                  )}
+                </div>
+
+                {/* 🔹 Course Videos Upload */}
+                <div className="space-y-2">
+                  <Label htmlFor="videos">Course Videos</Label>
+                  <Input
+                    id="videos"
+                    type="file"
+                    accept="video/*"
+                    multiple
+                    onChange={(e) => handleMuxMultipleUpload(e.target.files)}
+                  />
+                  {uploadingVideos && (
+                    <p className="text-sm text-muted-foreground">
+                      Uploading course videos...
+                    </p>
+                  )}
+                  {uploadedVideos.length > 0 && (
+                    <ul className="text-sm list-disc pl-4">
+                      {uploadedVideos.map((v, i) => (
+                        <li key={i}>{v.title}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Normal Product Fields (same as before) */}
+                {/* Price & Stock */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="stock">Stock Quantity</Label>
+                    <Input
+                      id="stock"
+                      {...register("stock", { valueAsNumber: true })}
+                      placeholder="0"
+                      type="number"
+                    />
+                  </div>
+                </div>
+
+                {/* Images */}
+                <div className="space-y-2">
+                  <Label>Product Images</Label>
+                  <ImageUpload
+                    maxImages={5}
+                    onImagesChange={(files) => {
+                      setImageFiles(files);
+                      setValue("images", files, { shouldValidate: true });
+                    }}
+                  />
+                </div>
+
+                {/* Options */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="condition">Condition</Label>
+                    <Select
+                      onValueChange={(value) =>
+                        setValue("condition", value as "new" | "used")
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select condition" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">New</SelectItem>
+                        <SelectItem value="used">Used</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center space-x-2 mt-4 sm:mt-8">
+                    <Checkbox
+                      id="freeShipping"
+                      checked={watch("freeShipping")}
+                      onCheckedChange={(checked) =>
+                        setValue("freeShipping", !!checked)
+                      }
+                    />
+                    <Label htmlFor="freeShipping">Free Shipping</Label>
+                  </div>
+                </div>
+
+                {/* Auction */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isAuction"
+                      checked={watch("isAuction")}
+                      onCheckedChange={(checked) => {
+                        setValue("isAuction", !!checked);
+                        if (!checked) setValue("auctionEndDate", "");
+                      }}
+                    />
+                    <Label htmlFor="isAuction">
+                      This is an auction product
+                    </Label>
+                  </div>
+
+                  {watch("isAuction") && (
+                    <div className="space-y-2">
+                      <Label htmlFor="auctionEndDate">Auction End Date</Label>
+                      <Input
+                        id="auctionEndDate"
+                        {...register("auctionEndDate")}
+                        type="datetime-local"
+                      />
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 

@@ -15,6 +15,10 @@ export interface ProductApi {
   category?: string | { name?: string; id?: string | number };
   categoryId?: string | number | { _id?: string | number; name?: string };
   badge?: string;
+  type?: string;
+  preveiwVideo?: string;
+  duration?: string;
+  videos?: (string | File)[];
   sellerId?:
     | string
     | number
@@ -33,6 +37,10 @@ export interface Product {
   categoryId?: string;
   badge?: string;
   sellerId?: string;
+  type?: string;
+  preveiwVideo?: string;
+  duration?: string;
+  videos?: (string | File)[];
 }
 
 export interface FetchProductsParams {
@@ -227,6 +235,10 @@ function mapProduct(api: ProductApi): Product {
     categoryId: mappedCategoryId,
     badge: api.badge,
     sellerId: mappedSellerId,
+    type: api.type,
+    previewVideo: api.previewVideo ?? api.preveiwVideo ?? "",
+    duration: api.duration ?? "",
+    videos: api.videos ?? [],
   };
 }
 
@@ -240,6 +252,7 @@ export async function fetchProductById(
   });
   if (!response.ok) return null;
   const json = await response.json();
+  console.log(json);
   const data: ProductApi =
     json?.data?.product ?? json?.product ?? json?.data ?? json;
   if (!data) return null;
@@ -421,6 +434,10 @@ export interface CreateProductData {
   condition?: "new" | "used";
   isAuction?: boolean;
   auctionEndDate?: string;
+  type: string;
+  duration?: string;
+  previewVideo?: string;
+  videos?: (File | string)[];
 }
 
 export async function createProduct(
@@ -435,8 +452,9 @@ export async function createProduct(
   formData.append("description", data.description);
   formData.append("categoryId", data.categoryId);
   formData.append("price", String(data.price));
-  formData.append("stock", String(data.stock));
 
+  // optional fields
+  if (data.stock !== undefined) formData.append("stock", String(data.stock));
   if (data.freeShipping !== undefined)
     formData.append("freeShipping", String(data.freeShipping));
   if (data.condition) formData.append("condition", data.condition);
@@ -444,11 +462,27 @@ export async function createProduct(
     formData.append("isAuction", String(data.isAuction));
   if (data.auctionEndDate)
     formData.append("auctionEndDate", data.auctionEndDate);
+  if (data.duration) formData.append("duration", data.duration);
+  if (data.type) formData.append("type", data.type);
+  // ✅ append images only if they exist
+  if (Array.isArray(data.images)) {
+    data.images.forEach((file) => {
+      formData.append("images", file);
+    });
+  }
 
-  // ✅ Append actual image files (NOT URLs)
-  data.images.forEach((file) => {
-    formData.append("images", file);
-  });
+  // ✅ append preview video if exists
+  if (data.previewVideo) {
+    formData.append("previewVideo", data.previewVideo);
+  }
+
+  // ✅ append course videos if exists
+  if (Array.isArray(data.videos)) {
+    data.videos.forEach((video, index) => {
+      formData.append(`videos[${index}][title]`, video.title);
+      formData.append(`videos[${index}][url]`, video.url);
+    });
+  }
 
   const response = await fetch(url, {
     method: "POST",

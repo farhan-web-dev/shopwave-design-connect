@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -118,8 +119,18 @@ const SellerLayout = ({ children }: SellerLayoutProps) => {
                 <Menu className="h-6 w-6" />
               )}
             </button>
-            <img src="/logo.jpg" alt="Logo" className="h-8 w-8 rounded-md" />
-            <span className="text-base sm:text-lg font-bold text-gray-800">
+            <Link to="/" className="">
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-2 px-3 py-1 text-sm text-gray-700"
+              >
+                <ArrowLeft /> <span className="hidden md:block">Home</span>
+              </Button>
+            </Link>
+
+            <img src="/logo.jpg" alt="Logo" className="h-12 w-12 rounded-md" />
+            <span className="hidden md:block text-base sm:text-lg font-bold text-gray-800">
               SellerDashboard
             </span>
           </div>

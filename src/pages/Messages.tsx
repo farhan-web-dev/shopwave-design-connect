@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Search, Phone, Info, Paperclip, Send } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BASE_URL } from "@/lib/url";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+// import { useRouter } from "next/router";
 
 interface BackendParticipant {
   _id: string;
@@ -62,6 +63,7 @@ const Messages = () => {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const sellerIdFromUrl = searchParams.get("sellerId");
+  const navigate = useNavigate();
 
   const currentUserId = user?.id;
   const authHeader = useMemo(
@@ -607,7 +609,12 @@ const Messages = () => {
                     >
                       ←
                     </Button>
-                    <Avatar className="h-10 w-10">
+                    <Avatar
+                      className="h-10 w-10 cursor-pointer"
+                      onClick={() =>
+                        navigate(`/seller/${selectedSender.receiver.id}`)
+                      }
+                    >
                       <AvatarImage src={undefined as unknown as string} />
                       <AvatarFallback>
                         {(selectedSender.conversationId?.startsWith(
@@ -798,7 +805,12 @@ const Messages = () => {
                   <CardHeader className="border-b border-gray-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <Avatar className="h-10 w-10">
+                        <Avatar
+                          className="h-10 w-10 cursor-pointer"
+                          onClick={() =>
+                            navigate(`/seller/${selectedSender.receiver.id}`)
+                          }
+                        >
                           <AvatarImage src={undefined as unknown as string} />
                           <AvatarFallback>
                             {(selectedSender.conversationId?.startsWith(

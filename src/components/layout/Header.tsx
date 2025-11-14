@@ -23,6 +23,7 @@ import {
   Grid,
   ChevronDown,
   Package,
+  Book,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -278,6 +279,11 @@ const Header = () => {
                         My Orders
                       </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="hover:bg-gray-100">
+                      <Link to="/courses" className="w-full">
+                        My Courses
+                      </Link>
+                    </DropdownMenuItem>
 
                     {user?.role === "seller" && (
                       <DropdownMenuItem asChild className="hover:bg-gray-100">
@@ -421,6 +427,20 @@ const Header = () => {
                         <Link to="/orders" className="flex items-center gap-2">
                           <Package className="h-5 w-5 text-amber-400" />
                           <span className="text-sm font-medium">My Orders</span>
+                        </Link>
+                      </Button>
+                    )}
+                    {isAuthenticated && (
+                      <Button
+                        variant="ghost"
+                        className="flex items-center justify-start px-4 py-2 rounded-lg hover:bg-gray-800 transition text-white"
+                        asChild
+                      >
+                        <Link to="/Courses" className="flex items-center gap-2">
+                          <Book className="h-5 w-5 text-amber-400" />
+                          <span className="text-sm font-medium">
+                            My Courses
+                          </span>
                         </Link>
                       </Button>
                     )}

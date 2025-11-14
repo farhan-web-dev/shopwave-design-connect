@@ -28,6 +28,7 @@ import BuyerMessages from "./pages/Messages";
 import Favourites from "./pages/Favourites";
 import Orders from "./pages/Orders";
 import Seller from "./pages/Seller";
+import CoursesPage from "./pages/Courses";
 
 const queryClient = new QueryClient();
 
@@ -141,6 +142,21 @@ const App = () => (
                     <Header />
                     <main className="flex-1">
                       <Favourites />
+                    </main>
+                    <Footer />
+                  </div>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/courses"
+              element={
+                <ProtectedRoute>
+                  <div className="flex flex-col min-h-screen">
+                    <Header />
+                    <main className="flex-1">
+                      <CoursesPage />
                     </main>
                     <Footer />
                   </div>

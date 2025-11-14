@@ -58,13 +58,13 @@ export default function SellerProfilePage() {
           alt="Seller Cover"
           className="w-full h-full object-cover rounded-b-2xl shadow-md"
         />
-        <div className="absolute -bottom-16 left-6 flex items-end gap-4">
+        <div className="absolute -bottom-20 left-6 flex items-end gap-4">
           <img
             src={sellerInfo?.userId?.profileImage || "/default-avatar.png"}
             alt={sellerInfo?.storeName}
             className="w-32 h-32 rounded-full border-4 border-white shadow-lg object-cover"
           />
-          <div className="mb-4">
+          <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {sellerInfo.storeName}
             </h1>

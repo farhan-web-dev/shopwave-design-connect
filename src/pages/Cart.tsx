@@ -195,28 +195,35 @@ const Cart = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
+        <h1 className="text-3xl font-bold mb-8 text-center sm:text-left">
+          Shopping Cart
+        </h1>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        {/* Responsive grid: stack on mobile, 3-col on large */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {cartItems.map((item) => (
               <Card key={item.productId}>
                 <CardContent className="p-4">
-                  <div className="flex gap-4">
+                  {/* Stack image & content on small screens */}
+                  <div className="flex flex-col sm:flex-row gap-4">
                     <img
                       src={item.image}
                       alt={item.title}
-                      className="w-24 h-24 object-cover rounded-lg"
+                      className="w-full sm:w-24 sm:h-24 h-48 object-cover rounded-lg"
                     />
 
                     <div className="flex-1">
-                      <h3 className="font-medium mb-1">{item.title}</h3>
-                      <p className="text-lg font-bold text-primary">
+                      <h3 className="font-medium mb-1 text-center sm:text-left">
+                        {item.title}
+                      </h3>
+                      <p className="text-lg font-bold text-primary text-center sm:text-left">
                         ${item.price.toFixed(2)}
                       </p>
 
-                      <div className="flex items-center gap-4 mt-3">
+                      {/* Quantity & Remove Buttons */}
+                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-center sm:justify-start gap-3 mt-3">
                         <div className="flex items-center border rounded-lg">
                           <Button
                             variant="ghost"
@@ -249,7 +256,8 @@ const Cart = () => {
                       </div>
                     </div>
 
-                    <div className="text-right">
+                    {/* Total price right-aligned on desktop, centered on mobile */}
+                    <div className="text-center sm:text-right mt-4 sm:mt-0">
                       <p className="font-bold text-lg">
                         ${(item.price * item.quantity).toFixed(2)}
                       </p>
@@ -261,10 +269,12 @@ const Cart = () => {
           </div>
 
           {/* Order Summary */}
-          <div>
+          <div className="sticky top-4 self-start">
             <Card>
               <CardContent className="p-6">
-                <h2 className="text-xl font-bold mb-4">Order Summary</h2>
+                <h2 className="text-xl font-bold mb-4 text-center sm:text-left">
+                  Order Summary
+                </h2>
                 <div className="space-y-3 mb-4">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>

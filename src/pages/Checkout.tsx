@@ -148,6 +148,8 @@ const Checkout = () => {
           price: item.price,
           quantity: item.quantity,
           image: item.image,
+          // type: item.type,
+          // videos: item.videos,
         })),
         shippingAddress: {
           fullName: form.fullName,

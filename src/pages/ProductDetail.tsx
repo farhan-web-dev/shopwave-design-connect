@@ -30,6 +30,8 @@ import {
   type Favourite,
 } from "@/lib/api/favourites";
 import { useAuth } from "@/contexts/AuthContext";
+import MuxPlayer from "@mux/mux-player-react";
+import { Lock, Play } from "lucide-react";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -46,7 +48,13 @@ const ProductDetail = () => {
       queryFn: () => fetchProductById(id || ""),
       enabled: !!id,
     });
-  console.log(product);
+  // console.log(product);
+  const playbackIdWithToken = product?.previewVideo?.split("/").pop() || "";
+  const [playbackId, tokenParam] = playbackIdWithToken.split("?token=");
+  const playbackToken = tokenParam?.replace("token=", "") || null;
+
+  console.log(playbackId);
+  console.log(playbackToken);
 
   const { data: ratingData } = useQuery({
     queryKey: ["product-rating", id],
@@ -184,43 +192,115 @@ const ProductDetail = () => {
         {/* ✅ Product Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-10 sm:mb-12">
           {/* ✅ Images Section */}
-          <div className="space-y-4">
-            <div className="aspect-square rounded-lg overflow-hidden bg-muted">
-              {images.length > 0 ? (
-                <img
-                  src={images[selectedImage]}
-                  alt={product?.title || ""}
-                  className="w-full h-full object-cover"
+          {/* ✅ Course Preview or Images Section */}
+          {product?.type === "course" ? (
+            <div className="space-y-6">
+              {/* 🎬 Preview Video */}
+              {product?.previewVideo ? (
+                <MuxPlayer
+                  streamType="on-demand"
+                  playbackId={playbackId}
+                  // playbackToken={playbackToken}
+                  controls
+                  autoPlay={false}
+                  className="w-full aspect-video rounded-lg overflow-hidden"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">
-                  No image
+                <div className="aspect-video flex items-center justify-center bg-muted rounded-lg">
+                  <p className="text-muted-foreground">
+                    No preview video available
+                  </p>
+                </div>
+              )}
+
+              {/* 🧠 Course Lessons */}
+              <div className="bg-card rounded-lg p-4 shadow-sm border">
+                <h3 className="font-semibold text-lg mb-3">Course Lessons</h3>
+                <div className="space-y-2">
+                  {product.videos && product.videos.length > 0 ? (
+                    product.videos.map((video, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-3 border rounded-md hover:bg-accent cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          {/** 🔒 Lock / ▶️ Play icon */}
+                          <div className="p-2 rounded-full bg-muted">
+                            {/* TODO: Replace with purchase check */}
+                            <Lock className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{video.title}</p>
+                            {video.duration && (
+                              <p className="text-xs text-muted-foreground">
+                                {video.duration} min
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            toast.info("Buy this course to access all videos");
+                          }}
+                        >
+                          View
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No videos uploaded for this course.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <Button className="w-full" size="lg" onClick={handleAddToCart}>
+                Buy Course
+              </Button>
+            </div>
+          ) : (
+            // 🖼️ Default image section for non-course products
+            <div className="space-y-4">
+              <div className="aspect-square rounded-lg overflow-hidden bg-muted">
+                {images.length > 0 ? (
+                  <img
+                    src={images[selectedImage]}
+                    alt={product?.title || ""}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">
+                    No image
+                  </div>
+                )}
+              </div>
+
+              {images.length > 1 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {images.slice(0, 4).map((image, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedImage(idx)}
+                      className={`aspect-square rounded-lg overflow-hidden border-2 transition ${
+                        selectedImage === idx
+                          ? "border-primary"
+                          : "border-transparent hover:border-muted-foreground"
+                      }`}
+                    >
+                      <img
+                        src={image}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
-
-            {images.length > 1 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {images.slice(0, 4).map((image, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedImage(idx)}
-                    className={`aspect-square rounded-lg overflow-hidden border-2 transition ${
-                      selectedImage === idx
-                        ? "border-primary"
-                        : "border-transparent hover:border-muted-foreground"
-                    }`}
-                  >
-                    <img
-                      src={image}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
 
           {/* ✅ Product Info */}
           <div className="space-y-5 sm:space-y-6">

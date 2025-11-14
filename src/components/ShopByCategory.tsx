@@ -11,24 +11,11 @@ interface Props {
 }
 
 const ShopByCategoryMenu = ({ categories, open, onClose }: Props) => {
-  // Separate main and subcategories here
+  // Separate main and subcategories
   const mainCategories = categories.filter((cat) => !cat.parentCategoryId);
+
   const getSubCategories = (parentId: string) =>
     categories.filter((cat) => cat.parentCategoryId?._id === parentId);
-
-  console.log(
-    categories.map((c) => ({
-      id: c._id,
-      name: c.name,
-      parentCategoryId: c.parentCategoryId,
-    }))
-  );
-
-  console.log("Main Categories:", mainCategories);
-  console.log(
-    "Subcategories:",
-    mainCategories.map((cat) => getSubCategories(cat._id))
-  );
 
   return (
     <AnimatePresence>
@@ -45,6 +32,7 @@ const ShopByCategoryMenu = ({ categories, open, onClose }: Props) => {
             {mainCategories.length > 0 ? (
               mainCategories.map((main) => {
                 const subs = getSubCategories(main._id);
+
                 return (
                   <div key={main._id} className="group">
                     {/* Main Category */}

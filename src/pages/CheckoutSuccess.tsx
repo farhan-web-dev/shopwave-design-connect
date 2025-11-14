@@ -157,7 +157,7 @@ const CheckoutSuccess = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.items.map((item) => (
+                {order?.items?.map((item) => (
                   <div key={item._id} className="flex items-center gap-4">
                     <img
                       src={item.image}

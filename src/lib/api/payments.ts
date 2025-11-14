@@ -9,6 +9,8 @@ export interface PaymentIntentRequest {
     price: number;
     quantity: number;
     image: string;
+    // type: string;
+    // videos: [];
   }>;
   shippingAddress: {
     fullName: string;
@@ -46,7 +48,10 @@ export interface OrderData {
     title: string;
     price: number;
     quantity: number;
+
     image: string;
+    // type: string;
+    // video: [string];
   }>;
   shippingAddress?: {
     fullName: string;
@@ -80,6 +85,7 @@ export async function createPaymentIntent(
       isGuest: !token, // ✅ mark if it’s a guest payment
     }),
   });
+  console.log("paymentData", paymentData);
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

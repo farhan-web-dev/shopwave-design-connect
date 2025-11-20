@@ -27,27 +27,40 @@ const SellerOnboarding = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!form.storeName) {
       toast.error("Store name is required");
       return;
     }
+
     if (!token) {
       toast.error("You must be logged in");
       return;
     }
+
     setIsLoading(true);
     try {
-      await createSellerProfile(
+      const response = await createSellerProfile(
         {
           storeName: form.storeName,
           storeAddress: form.storeAddress || undefined,
           description: form.description || undefined,
           logo: form.logo || undefined,
+          userId: user._id || user.id,
         },
         token
       );
+
+      const onboardingUrl = response?.data?.stripeOnboardingUrl;
+
+      if (onboardingUrl) {
+        // ✅ Redirect user to Stripe onboarding
+        window.location.href = onboardingUrl;
+        return;
+      }
+
       toast.success("Seller profile created");
-      navigate("/");
+      navigate("/"); // fallback
     } catch (err) {
       toast.error("Failed to create seller profile");
     } finally {
